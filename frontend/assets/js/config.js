@@ -1,6 +1,6 @@
 // API Configuration
 // TODO: GANTI NANTI (GA ADA MEKANISME .ENV UTK STATIC HTML CSS JS)
-const API_BASE_URL = "https://virtual-web-ratu-be.vercel.app";
+const API_BASE_URL = "https://virtual-web-ratu-dina-be.vercel.app";
 
 export const API_ENDPOINTS = {
   AUTH: {
