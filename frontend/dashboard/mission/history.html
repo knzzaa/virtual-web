@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title id="pageTitle">EnglishLab - Mission History</title>
+    <link rel="stylesheet" href="../../assets/css/style.css" />
+    <link rel="stylesheet" href="../../assets/css/history.css" />
+    <link rel="stylesheet" href="../../assets/css/mission.css" />
+    <script type="module" src="../../assets/js/protected.js"></script>
+  </head>
+
+  <body>
+    <div class="page-container">
+      <!-- Sidebar -->
+      <aside class="sidebar">
+        <a href="../../index.html" class="logo-link">
+          <h1 class="logo">ENGLISHLAB</h1>
+        </a>
+
+        <nav class="menu">
+          <a href="../material/index.html" class="menu-item">
+            <h3>Material</h3>
+            <p>20 min</p>
+          </a>
+          <a href="../exam/index.html" class="menu-item">
+            <h3>Exam</h3>
+            <p>10 min</p>
+          </a>
+          <a href="index.html" class="menu-item active">
+            <h3>Mission</h3>
+            <p>15 min</p>
+          </a>
+        </nav>
+
+        <div class="logout-container">
+          <button id="logoutBtn" class="logout-btn">Logout</button>
+        </div>
+      </aside>
+
+      <!-- Main Content -->
+      <main class="main-content">
+        <div class="header">
+          <a href="index.html" class="back-link">← BACK</a>
+        </div>
+
+        <!-- Dynamic mission history content will be loaded here -->
+        <div id="historyContent">
+          <div class="loading-state">
+            <div class="spinner"></div>
+            <p class="loading-text">Loading mission history...</p>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <script type="module" src="../../assets/js/mission-history-page.js"></script>
+  </body>
+</html>

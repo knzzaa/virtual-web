@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EnglishLab - Mission Challenge</title>
+    <link rel="stylesheet" href="../../assets/css/style.css" />
+    <link rel="stylesheet" href="../../assets/css/mission.css" />
+    <script type="module" src="../../assets/js/protected.js"></script>
+  </head>
+
+  <body>
+    <div class="page-container">
+      <!-- Sidebar -->
+      <aside class="sidebar">
+        <a href="../../index.html" class="logo-link">
+        <h1 class="logo">ENGLISHLAB</h1>
+      </a>
+
+        <nav class="menu">
+          <a href="../material/index.html" class="menu-item">
+            <h3>Material</h3>
+            <p>20 min</p>
+          </a>
+          <a href="../exam/index.html" class="menu-item">
+            <h3>Exam</h3>
+            <p>10 min</p>
+          </a>
+          <a href="index.html" class="menu-item active">
+            <h3>Mission</h3>
+            <p>15 min</p>
+          </a>
+        </nav>
+
+        <div class="logout-container">
+          <button id="logoutBtn" class="logout-btn">
+            Logout
+          </button>
+        </div>
+      </aside>
+
+      <!-- Main Content -->
+      <main class="main-content">
+        <div class="header">
+          <a href="index.html" class="back-link">← BACK</a>
+        </div>
+
+        <div class="progress-container">
+          <div class="progress-fill" id="progress"></div>
+        </div>
+
+        <div id="quiz-section">
+          <div class="question" id="question"></div>
+          <div class="options" id="options"></div>
+        </div>
+
+        <div class="final-screen" id="final-screen">
+          <div class="final-content">
+            <img
+              src="../../assets/img/mission-completed.png"
+              alt="Mission Completed"
+            />
+            <div>
+              <h2>Mission Completed!</h2>
+              <p id="score"></p>
+            </div>
+          </div>
+          <a href="index.html" class="restart-btn">
+            <span>Continue to Next Mission</span>
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M5 12h14M12 5l7 7-7 7" />
+            </svg>
+          </a>
+        </div>
+
+        <div class="result-bar" id="result">
+          <div class="check-icon" id="correctAnswer">✓</div>
+          <div class="check-icon" id="wrongAnswer">✗</div>
+          <span id="resultText"></span>
+        </div>
+      </main>
+    </div>
+    <script type="module" src="../../assets/js/mission-show-page.js"></script>
+  </body>
+</html>

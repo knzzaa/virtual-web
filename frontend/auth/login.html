@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Login - EnglishLab</title>
+    <link rel="stylesheet" href="../assets/css/auth.css" />
+  </head>
+
+  <body>
+    <a href="../index.html" class="back-button" title="Back to home">
+      <svg
+        width="24"
+        height="24"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="M19 12H5M12 19l-7-7 7-7" />
+      </svg>
+    </a>
+
+    <div class="auth-container">
+      <div class="auth-box">
+        <div class="auth-header">
+          <h1 class="logo">ENGLISHLAB</h1>
+          <h2>Welcome Back!</h2>
+          <p class="subtitle">Login to continue your learning journey</p>
+        </div>
+
+        <form id="loginForm" class="auth-form">
+          <div class="form-group">
+            <label for="email">Email</label>
+            <input
+              type="email"
+              id="email"
+              name="email"
+              placeholder="Enter your email"
+              required
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="password">Password</label>
+            <input
+              type="password"
+              id="password"
+              name="password"
+              placeholder="Enter your password"
+              required
+            />
+          </div>
+
+          <button type="submit" class="auth-btn">LOGIN</button>
+
+          <div class="auth-divider">
+            <span>or</span>
+          </div>
+
+          <div class="auth-links">
+            <p>Don't have an account? <a href="register.html">Sign up</a></p>
+          </div>
+
+          <div id="errorMessage" class="error-message"></div>
+          <div id="successMessage" class="success-message"></div>
+        </form>
+      </div>
+
+      <div class="auth-illustration">
+        <img src="../assets/img/bear.png" alt="Learning illustration" />
+        <div class="illustration-text">
+          <h3>Start Your English Journey</h3>
+          <p>
+            Learn, practice, and master English with our interactive lessons
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="../assets/js/login.js"></script>
+  </body>
+</html>

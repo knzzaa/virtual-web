@@ -1,0 +1,158 @@
+/* Exam Pages Styles */
+
+/* Page Header */
+.exam-header {
+  margin-bottom: 2rem;
+}
+
+.exam-title {
+  color: var(--text-dark);
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.exam-description {
+  color: var(--text-light);
+  font-size: 1rem;
+  margin: 0;
+}
+
+/* Exam-specific container (uses global .content-card) */
+
+/* Reading Passage */
+.reading-passage {
+  background: var(--bg-light);
+  padding: 1.5rem;
+  border-radius: 12px;
+  margin-bottom: 2rem;
+  border-left: 4px solid var(--primary);
+}
+
+.reading-passage h3 {
+  color: var(--primary);
+  margin-bottom: 1rem;
+  font-size: 1.25rem;
+}
+
+.reading-passage p {
+  line-height: 1.8;
+  color: var(--text-dark);
+  margin-bottom: 1rem;
+}
+
+.reading-passage p:last-child {
+  margin-bottom: 0;
+}
+
+/* Questions List */
+.questions-list {
+  padding-left: 1.5rem;
+  counter-reset: question-counter;
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.question-item {
+  margin: 0 0 2rem 0; /* Override global li margin */
+  line-height: 1.8;
+  color: var(--text-dark);
+  list-style: decimal;
+  padding-left: 0.5rem;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.question-item:first-child {
+  margin-top: 0;
+  padding-top: 0;
+}
+
+.question-item:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+/* Inline text inputs */
+.inline-input {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 1rem;
+  min-width: 150px;
+  margin: 0 0.25rem;
+  transition: border-color 0.2s ease;
+}
+
+.inline-input:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.inline-input.wrong {
+  border-color: #dc3545;
+  background-color: #f8d7da;
+}
+
+.inline-input.correct {
+  border-color: #28a745;
+  background-color: #d4edda;
+}
+
+/* Radio Options */
+.radio-options {
+  margin-top: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.radio-label {
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: 6px;
+  transition: background 0.2s ease;
+}
+
+.radio-label:hover {
+  background: var(--bg-light);
+}
+
+.radio-label input[type="radio"] {
+  margin-right: 0.5rem;
+}
+
+/* Exam-specific button styles */
+.btn-retry {
+  background: #6c757d;
+}
+
+/* Result Message */
+.result-message {
+  margin-top: 2rem;
+  padding: 1rem;
+  border-radius: 8px;
+  font-weight: 600;
+  text-align: center;
+  display: none;
+}
+
+.result-message.show {
+  display: block;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .exam-title {
+    font-size: 1.5rem;
+  }
+
+  .button-group {
+    flex-direction: column;
+  }
+
+  .button-group .btn {
+    width: 100%;
+  }
+}

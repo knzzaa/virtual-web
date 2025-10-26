@@ -1,0 +1,169 @@
+/* Material Pages Styles */
+
+/* Page Header */
+.page-header {
+  margin-bottom: 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.page-header-content {
+  flex: 1;
+}
+
+.page-header .heart {
+  position: relative;
+  font-size: 2rem;
+  margin-top: 0.5rem;
+  color: #d0d0d0;
+  background: rgba(0, 0, 0, 0.04);
+  border: none;
+  cursor: pointer;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+}
+
+.page-header .heart:hover {
+  background: rgba(0, 0, 0, 0.08);
+  transform: scale(1.1);
+  color: #b0b0b0;
+}
+
+.page-header .heart.liked {
+  color: #ff1744;
+  background: rgba(255, 23, 68, 0.1);
+  animation: heartBeat 0.3s ease;
+}
+
+.page-title {
+  color: var(--text-dark);
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.page-subtitle {
+  color: var(--text-light);
+  font-size: 1rem;
+  margin: 0;
+}
+
+/* Material-specific content wrapper (uses global .content-card) */
+
+/* Section Headers */
+.section-header {
+  color: var(--primary);
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+  margin-top: 2rem;
+}
+
+.section-header:first-child {
+  margin-top: 0;
+}
+
+.subsection-header {
+  color: var(--secondary);
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  margin-top: 1.5rem;
+}
+
+/* Content Paragraphs */
+.content-text {
+  line-height: 1.8;
+  color: var(--text-dark);
+  margin-bottom: 1rem;
+}
+
+/* Example Boxes */
+.example-box {
+  background: var(--bg-light);
+  padding: 1rem;
+  border-radius: 8px;
+  margin: 1rem 0;
+  border-left: 3px solid var(--accent);
+}
+
+.example-box p {
+  margin: 0.5rem 0;
+  color: var(--text-dark);
+}
+
+.example-box p:first-child {
+  margin-top: 0;
+}
+
+.example-box p:last-child {
+  margin-bottom: 0;
+}
+
+.example-box strong {
+  color: var(--secondary);
+}
+
+/* Lists */
+.content-list {
+  padding-left: 1.5rem;
+  color: var(--text-dark);
+  line-height: 1.8;
+  margin: 1rem 0;
+}
+
+.content-list li {
+  margin-bottom: 0.5rem;
+}
+
+/* Tips Box */
+.tips-box {
+  background: #e8f5e9;
+  padding: 1.5rem;
+  border-radius: 12px;
+  margin: 2rem 0;
+  border-left: 4px solid var(--accent);
+}
+
+.tips-box h4 {
+  color: var(--secondary);
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+
+.tips-box ul {
+  padding-left: 1.5rem;
+  color: var(--text-dark);
+  line-height: 1.8;
+  margin: 0;
+}
+
+/* Table Styling */
+.content-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+}
+
+.content-table th,
+.content-table td {
+  padding: 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.content-table th {
+  background: var(--bg-light);
+  color: var(--secondary);
+  font-weight: 600;
+}
+
+.content-table tr:hover {
+  background: var(--bg-light);
+}
