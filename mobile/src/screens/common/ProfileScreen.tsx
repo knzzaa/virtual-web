@@ -1,7 +1,8 @@
 import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, Image } from "react-native";
 import Button from "../../components/Button";
 import { useAuth } from "../../context/auth.context";
+import theme from "../../styles/theme";
 
 export default function ProfileScreen() {
   const { me, logout } = useAuth();
@@ -9,25 +10,43 @@ export default function ProfileScreen() {
   if (!me) {
     return (
       <View style={styles.wrap}>
-        <Text>Not logged in</Text>
+        <Text style={{ color: theme.colors.text }}>Not logged in</Text>
       </View>
     );
   }
 
   return (
     <View style={styles.wrap}>
-      <Text style={styles.title}>Profile</Text>
-      <Text style={styles.line}>Name: {me.name}</Text>
-      <Text style={styles.line}>Email: {me.email}</Text>
+      <View style={styles.card}>
+        <Image source={require("../../../assets/img/about-us.png")} style={styles.avatar} />
+        <Text style={styles.title}>Profile</Text>
 
-      <View style={{ height: 16 }} />
-      <Button title="Logout" onPress={logout} />
+        <View style={{ height: theme.spacing.md }} />
+        <Text style={styles.label}>Name</Text>
+        <Text style={styles.value}>{me.name}</Text>
+
+        <View style={{ height: theme.spacing.md }} />
+        <Text style={styles.label}>Email</Text>
+        <Text style={styles.value}>{me.email}</Text>
+
+        <View style={{ height: theme.spacing.lg }} />
+        <Button title="Logout" onPress={logout} />
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { flex: 1, padding: 16 },
-  title: { fontSize: 22, fontWeight: "800", marginBottom: 12 },
-  line: { marginBottom: 6 },
+  wrap: { flex: 1, padding: theme.spacing.lg, backgroundColor: theme.colors.background },
+  card: {
+    padding: theme.spacing.xl,
+    borderWidth: theme.card.borderWidth,
+    borderColor: theme.card.borderColor,
+    borderRadius: theme.radius.lg,
+    backgroundColor: theme.colors.card,
+  },
+  avatar: { width: 64, height: 64, alignSelf: "center", marginBottom: 10 },
+  title: { fontSize: 22, fontWeight: "900", color: theme.colors.text, textAlign: "center" },
+  label: { fontSize: 12, fontWeight: "800", color: theme.colors.muted },
+  value: { fontSize: 16, fontWeight: "700", color: theme.colors.text, marginTop: 4 },
 });

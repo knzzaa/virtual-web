@@ -1,5 +1,6 @@
 import React from "react";
 import { Pressable, Text, StyleSheet } from "react-native";
+import theme from "../styles/theme";
 
 export default function Button({
   title,
@@ -18,7 +19,12 @@ export default function Button({
 }
 
 const styles = StyleSheet.create({
-  btn: { padding: 12, borderRadius: 10, backgroundColor: "#222", alignItems: "center" },
+  btn: {
+    padding: theme.spacing.md,
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.primary,
+    alignItems: "center",
+  },
   txt: { color: "white", fontWeight: "600" },
   disabled: { opacity: 0.5 },
 });

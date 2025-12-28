@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { View, Text, FlatList, StyleSheet, RefreshControl } from "react-native";
 import { missionService } from "../../services/mission.service";
 import type { MissionCompletionHistoryItem } from "../../types/dtos";
+import theme from "../../styles/theme";
 
 export default function MissionHistoryScreen() {
   const [items, setItems] = useState<MissionCompletionHistoryItem[]>([]);
@@ -22,7 +23,7 @@ export default function MissionHistoryScreen() {
   }, []);
 
   return (
-    <View style={{ flex: 1, padding: 16 }}>
+    <View style={styles.wrap}>
       <FlatList
         data={items}
         keyExtractor={(it) => String(it.id)}
@@ -42,7 +43,15 @@ export default function MissionHistoryScreen() {
 }
 
 const styles = StyleSheet.create({
-  card: { padding: 14, borderWidth: 1, borderColor: "#eee", borderRadius: 12, marginBottom: 10 },
-  title: { fontWeight: "900" },
-  meta: { opacity: 0.6, marginTop: 4, fontSize: 12 },
+  wrap: { flex: 1, padding: theme.spacing.lg },
+  card: {
+    padding: theme.card.padding,
+    borderWidth: theme.card.borderWidth,
+    borderColor: theme.card.borderColor,
+    borderRadius: theme.card.borderRadius,
+    marginBottom: theme.spacing.sm,
+    backgroundColor: theme.colors.card,
+  },
+  title: { fontWeight: "900", color: theme.colors.text },
+  meta: { opacity: 0.6, marginTop: 4, fontSize: 12, color: theme.colors.muted },
 });

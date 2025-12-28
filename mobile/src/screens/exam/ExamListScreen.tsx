@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, FlatList, Pressable, StyleSheet, RefreshControl } from "react-native";
+import { View, Text, FlatList, Pressable, StyleSheet, RefreshControl, Image } from "react-native";
+import theme from "../../styles/theme";
 import { examService } from "../../services/exam.service";
 import type { ExamListItem } from "../../types/dtos";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
@@ -25,15 +26,20 @@ export default function ExamListScreen({ navigation }: Props) {
   }, []);
 
   return (
-    <View style={{ flex: 1, padding: 16 }}>
+    <View style={{ flex: 1, padding: theme.spacing.lg }}>
       <FlatList
         data={items}
         keyExtractor={(it) => it.slug}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={load} />}
         renderItem={({ item }) => (
           <Pressable style={styles.card} onPress={() => navigation.navigate("ExamDetail", { slug: item.slug })}>
-            <Text style={styles.title}>{item.title}</Text>
-            {!!item.description && <Text style={styles.desc}>{item.description}</Text>}
+            <View style={styles.row}>
+              <Image source={require("../../../assets/img/clock.png")} style={styles.icon} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.title}>{item.title}</Text>
+                {!!item.description && <Text style={styles.desc}>{item.description}</Text>}
+              </View>
+            </View>
             <Pressable onPress={() => navigation.navigate("ExamHistory", { slug: item.slug })}>
               <Text style={styles.link}>View submissions</Text>
             </Pressable>
@@ -46,8 +52,10 @@ export default function ExamListScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  card: { padding: 14, borderWidth: 1, borderColor: "#eee", borderRadius: 12, marginBottom: 10 },
-  title: { fontWeight: "900", fontSize: 16, marginBottom: 4 },
-  desc: { opacity: 0.75, marginBottom: 8 },
-  link: { fontWeight: "800" },
+  card: { padding: theme.card.padding, borderWidth: theme.card.borderWidth, borderColor: theme.card.borderColor, borderRadius: theme.card.borderRadius, marginBottom: theme.spacing.sm, backgroundColor: theme.colors.card },
+  title: { fontWeight: "900", fontSize: 16, marginBottom: 4, color: theme.colors.text },
+  desc: { opacity: 0.75, marginBottom: 8, color: theme.colors.muted },
+  link: { fontWeight: "800", color: theme.colors.accent },
+  row: { flexDirection: "row", alignItems: "center" },
+  icon: { width: 36, height: 36, marginRight: 12 },
 });

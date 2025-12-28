@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { View, Text, StyleSheet, ScrollView, TextInput, Pressable, Alert } from "react-native";
 import HtmlContent from "../../components/HtmlContent";
 import Button from "../../components/Button";
+import theme from "../../styles/theme";
 import { examService } from "../../services/exam.service";
 import type { ExamDetailResponse } from "../../types/dtos";
 import { QuestionType } from "../../types/enums";
@@ -55,7 +56,7 @@ export default function ExamDetailScreen({ route, navigation }: Props) {
   return (
     <ScrollView contentContainerStyle={{ padding: 16 }}>
       <Text style={styles.title}>{data.exam.title}</Text>
-      {!!data.exam.description && <Text style={{ opacity: 0.75 }}>{data.exam.description}</Text>}
+      {!!data.exam.description && <Text style={styles.desc}>{data.exam.description}</Text>}
 
       {data.exam.htmlContent ? (
         <>
@@ -87,7 +88,7 @@ export default function ExamDetailScreen({ route, navigation }: Props) {
                   onPress={() => setAnswers((prev) => ({ ...prev, [String(q.questionNumber)]: String(idx) }))}
                   style={[styles.opt, selected && styles.optSelected]}
                 >
-                  <Text style={{ fontWeight: "700" }}>{opt}</Text>
+                  <Text style={styles.optTxt}>{opt}</Text>
                 </Pressable>
               );
             })
@@ -102,11 +103,20 @@ export default function ExamDetailScreen({ route, navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  title: { fontSize: 22, fontWeight: "900", marginBottom: 6 },
-  qCard: { padding: 14, borderWidth: 1, borderColor: "#eee", borderRadius: 12, marginBottom: 12 },
-  qTitle: { fontWeight: "900", marginBottom: 6 },
-  qText: { fontWeight: "700" },
-  input: { borderWidth: 1, borderColor: "#ddd", borderRadius: 10, padding: 12 },
-  opt: { padding: 12, borderRadius: 12, borderWidth: 1, borderColor: "#eee", marginBottom: 10 },
-  optSelected: { borderColor: "#222" },
+  title: { fontSize: 22, fontWeight: "900", marginBottom: 6, color: theme.colors.text },
+  desc: { opacity: 0.75, marginBottom: 8, color: theme.colors.muted },
+  qCard: {
+    padding: theme.card.padding,
+    borderWidth: theme.card.borderWidth,
+    borderColor: theme.card.borderColor,
+    borderRadius: theme.card.borderRadius,
+    marginBottom: theme.spacing.md,
+    backgroundColor: theme.colors.card,
+  },
+  qTitle: { fontWeight: "900", marginBottom: 6, color: theme.colors.text },
+  qText: { fontWeight: "700", color: theme.colors.text },
+  input: { borderWidth: 1, borderColor: "#ddd", borderRadius: theme.radius.sm, padding: theme.spacing.md, backgroundColor: "#fafafa" },
+  opt: { padding: theme.spacing.md, borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.border, marginBottom: 10, backgroundColor: theme.colors.card },
+  optSelected: { borderColor: theme.colors.primary },
+  optTxt: { fontWeight: "700", color: theme.colors.text },
 });

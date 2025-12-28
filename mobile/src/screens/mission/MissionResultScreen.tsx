@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import Button from "../../components/Button";
+import theme from "../../styles/theme";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { MissionStackParamList } from "../../navigation/MissionStack";
 
@@ -22,7 +23,7 @@ export default function MissionResultScreen({ route, navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  wrap: { flex: 1, padding: 16, justifyContent: "center" },
-  title: { fontSize: 24, fontWeight: "900", marginBottom: 10 },
-  line: { fontSize: 16, marginBottom: 6 },
+  wrap: { flex: 1, padding: theme.spacing.lg, justifyContent: "center" },
+  title: { fontSize: 24, fontWeight: "900", marginBottom: 10, color: theme.colors.text },
+  line: { fontSize: 16, marginBottom: 6, color: theme.colors.text },
 });

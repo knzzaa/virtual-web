@@ -4,6 +4,7 @@ import { examService } from "../../services/exam.service";
 import type { ExamSubmissionHistoryItem } from "../../types/dtos";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { ExamStackParamList } from "../../navigation/ExamStack";
+import theme from "../../styles/theme";
 
 type Props = NativeStackScreenProps<ExamStackParamList, "ExamHistory">;
 
@@ -26,7 +27,7 @@ export default function ExamHistoryScreen({ route }: Props) {
   }, [slug]);
 
   return (
-    <View style={{ flex: 1, padding: 16 }}>
+    <View style={{ flex: 1, padding: theme.spacing.lg }}>
       <FlatList
         data={items}
         keyExtractor={(it) => String(it.id)}
@@ -46,7 +47,14 @@ export default function ExamHistoryScreen({ route }: Props) {
 }
 
 const styles = StyleSheet.create({
-  card: { padding: 14, borderWidth: 1, borderColor: "#eee", borderRadius: 12, marginBottom: 10 },
-  title: { fontWeight: "900" },
-  meta: { opacity: 0.6, marginTop: 4, fontSize: 12 },
+  card: {
+    padding: theme.card.padding,
+    borderWidth: theme.card.borderWidth,
+    borderColor: theme.card.borderColor,
+    borderRadius: theme.card.borderRadius,
+    marginBottom: theme.spacing.sm,
+    backgroundColor: theme.colors.card,
+  },
+  title: { fontWeight: "900", color: theme.colors.text },
+  meta: { opacity: 0.6, marginTop: 4, fontSize: 12, color: theme.colors.muted },
 });
