@@ -1,0 +1,11 @@
+{
+  "expo": {
+    "name": "EnglishLab",
+    "slug": "englishlab",
+    "scheme": "englishlab",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "platforms": ["ios", "android", "web"],
+    "sdkVersion": "51.0.0"
+  }
+}
