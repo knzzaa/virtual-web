@@ -1,0 +1,21 @@
+# Expo and Node
+.expo/
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# macOS
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
+
+# TypeScript
+*.tsbuildinfo
+
+# Build outputs
+web-build/
+
+# Misc
+.env
