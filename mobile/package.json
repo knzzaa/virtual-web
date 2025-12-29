@@ -13,7 +13,8 @@
     "ios:build": "expo run:ios",
     "ios:nobundler": "expo run:ios --no-install --no-bundler",
     "ios:open": "npx uri-scheme open \"exp+englishlab://expo-development-client/?url=http%3A%2F%2F127.0.0.1%3A8081\" --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@expo-google-fonts/inter": "^0.4.2",

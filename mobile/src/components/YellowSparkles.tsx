@@ -22,9 +22,17 @@ type Sparkle = {
 type Props = {
   /** Number of sparkles (keep small for perf). */
   count?: number;
+  /** Sparkle color (defaults to warm yellow). */
+  color?: string;
+  /** Matching shadow color (defaults to warm yellow). */
+  shadowColor?: string;
 };
 
-function YellowSparklesBase({ count = 14 }: Props) {
+function YellowSparklesBase({
+  count = 14,
+  color = "rgba(255, 214, 102, 0.95)",
+  shadowColor = "rgba(255, 214, 102, 1)",
+}: Props) {
   const sparkles = useMemo<Sparkle[]>(() => {
     // Deterministic-ish layout.
     const arr: Sparkle[] = [];
@@ -45,13 +53,21 @@ function YellowSparklesBase({ count = 14 }: Props) {
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
       {sparkles.map((s, idx) => (
-        <SparkleDot key={idx} s={s} />
+        <SparkleDot key={idx} s={s} color={color} shadowColor={shadowColor} />
       ))}
     </View>
   );
 }
 
-function SparkleDot({ s }: { s: Sparkle }) {
+function SparkleDot({
+  s,
+  color,
+  shadowColor,
+}: {
+  s: Sparkle;
+  color: string;
+  shadowColor: string;
+}) {
   const p = useSharedValue(0);
   const tw = useSharedValue(0);
 
@@ -69,10 +85,10 @@ function SparkleDot({ s }: { s: Sparkle }) {
   }, [p, tw, s.delay]);
 
   const style = useAnimatedStyle(() => {
-    const dx = interpolate(p.value, [0, 1], [-s.drift, s.drift]);
-    const dy = interpolate(p.value, [0, 1], [s.drift, -s.drift]);
-    const opacity = interpolate(tw.value, [0, 1], [0.08, 0.42]);
-    const scale = interpolate(tw.value, [0, 1], [0.85, 1.25]);
+    const dx = interpolate(p.value, [0, 1], [-s.drift * 1.25, s.drift * 1.25]);
+    const dy = interpolate(p.value, [0, 1], [s.drift * 1.25, -s.drift * 1.25]);
+    const opacity = interpolate(tw.value, [0, 1], [0.06, 0.50]);
+    const scale = interpolate(tw.value, [0, 1], [0.82, 1.35]);
 
     return {
       opacity,
@@ -91,6 +107,8 @@ function SparkleDot({ s }: { s: Sparkle }) {
           left: `${s.xPct * 100}%`,
           top: `${s.yPct * 100}%`,
           shadowRadius: s.blur,
+          backgroundColor: color,
+          shadowColor,
         },
         style,
       ]}
@@ -101,8 +119,6 @@ function SparkleDot({ s }: { s: Sparkle }) {
 const styles = StyleSheet.create({
   dot: {
     position: "absolute",
-    backgroundColor: "rgba(255, 214, 102, 0.95)",
-    shadowColor: "rgba(255, 214, 102, 1)",
     shadowOpacity: 0.65,
     shadowOffset: { width: 0, height: 0 },
   },
