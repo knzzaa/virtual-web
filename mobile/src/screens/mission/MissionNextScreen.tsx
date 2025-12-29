@@ -5,6 +5,7 @@ import type { MissionNextResponse } from "../../types/dtos";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { MissionStackParamList } from "../../navigation/MissionStack";
 import theme from "../../styles/theme";
+import AnimatedAppBackground from "../../components/AnimatedAppBackground";
 
 type Props = NativeStackScreenProps<MissionStackParamList, "MissionNext">;
 
@@ -79,13 +80,23 @@ export default function MissionNextScreen({ navigation }: Props) {
     }
   }
 
-  if (!data) return <View style={{ padding: 16 }}><Text>Loading...</Text></View>;
+  if (!data)
+    return (
+      <View style={{ flex: 1 }}>
+        <AnimatedAppBackground />
+        <View style={{ padding: 16 }}>
+          <Text>Loading...</Text>
+        </View>
+      </View>
+    );
 
   // all completed
   if ((data as any).mission === null) {
     return (
-      <View style={styles.wrap}>
-        <View style={styles.headerCard}>
+      <View style={styles.screen}>
+        <AnimatedAppBackground />
+        <View style={styles.wrap}>
+          <View style={styles.headerCard}>
           <View style={styles.headerRow}>
             <Image source={require("../../../assets/img/mission-completed.png")} style={styles.headerIcon} />
             <View style={{ flex: 1 }}>
@@ -98,6 +109,7 @@ export default function MissionNextScreen({ navigation }: Props) {
           <Pressable style={styles.link} onPress={() => navigation.navigate("MissionHistory")}>
             <Text style={styles.linkTxt}>View completion history</Text>
           </Pressable>
+          </View>
         </View>
       </View>
     );
@@ -109,8 +121,10 @@ export default function MissionNextScreen({ navigation }: Props) {
   const pct = mission.totalQuestions ? Math.min(1, q.questionNumber / mission.totalQuestions) : 0;
 
   return (
-    <View style={styles.wrap}>
-      <View style={styles.headerCard}>
+    <View style={styles.screen}>
+      <AnimatedAppBackground />
+      <View style={styles.wrap}>
+        <View style={styles.headerCard}>
         <View style={styles.headerRow}>
           <Image source={require("../../../assets/img/mission.png")} style={styles.headerIcon} />
           <View style={{ flex: 1 }}>
@@ -183,15 +197,17 @@ export default function MissionNextScreen({ navigation }: Props) {
         ))
       )}
 
-      <View style={{ height: 16 }} />
-      <Pressable style={styles.link} onPress={() => navigation.navigate("MissionHistory")}>
-        <Text style={styles.linkTxt}>View completion history</Text>
-      </Pressable>
+        <View style={{ height: 16 }} />
+        <Pressable style={styles.link} onPress={() => navigation.navigate("MissionHistory")}>
+          <Text style={styles.linkTxt}>View completion history</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: { flex: 1 },
   wrap: { flex: 1, padding: theme.spacing.lg },
   headerCard: {
     padding: theme.spacing.lg,

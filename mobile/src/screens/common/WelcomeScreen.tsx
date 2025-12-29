@@ -4,7 +4,7 @@ import theme from "../../styles/theme";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { AuthStackParamList } from "../../navigation/AuthStack";
 
-type Props = NativeStackScreenProps<AuthStackParamList, "Login">;
+type Props = NativeStackScreenProps<AuthStackParamList, "Welcome">;
 
 export default function WelcomeScreen({ navigation }: Props) {
   return (

@@ -3,41 +3,49 @@ import { View, Text, StyleSheet, Image } from "react-native";
 import Button from "../../components/Button";
 import { useAuth } from "../../context/auth.context";
 import theme from "../../styles/theme";
+import AnimatedAppBackground from "../../components/AnimatedAppBackground";
 
 export default function ProfileScreen() {
   const { me, logout } = useAuth();
 
   if (!me) {
     return (
-      <View style={styles.wrap}>
-        <Text style={{ color: theme.colors.text }}>Not logged in</Text>
+      <View style={styles.screen}>
+        <AnimatedAppBackground />
+        <View style={styles.wrap}>
+          <Text style={{ color: theme.colors.text }}>Not logged in</Text>
+        </View>
       </View>
     );
   }
 
   return (
-    <View style={styles.wrap}>
-      <View style={styles.card}>
-        <Image source={require("../../../assets/img/about-us.png")} style={styles.avatar} />
-        <Text style={styles.title}>Profile</Text>
+    <View style={styles.screen}>
+      <AnimatedAppBackground />
+      <View style={styles.wrap}>
+        <View style={styles.card}>
+          <Image source={require("../../../assets/img/about-us.png")} style={styles.avatar} />
+          <Text style={styles.title}>Profile</Text>
 
-        <View style={{ height: theme.spacing.md }} />
-        <Text style={styles.label}>Name</Text>
-        <Text style={styles.value}>{me.name}</Text>
+          <View style={{ height: theme.spacing.md }} />
+          <Text style={styles.label}>Name</Text>
+          <Text style={styles.value}>{me.name}</Text>
 
-        <View style={{ height: theme.spacing.md }} />
-        <Text style={styles.label}>Email</Text>
-        <Text style={styles.value}>{me.email}</Text>
+          <View style={{ height: theme.spacing.md }} />
+          <Text style={styles.label}>Email</Text>
+          <Text style={styles.value}>{me.email}</Text>
 
-        <View style={{ height: theme.spacing.lg }} />
-        <Button title="Logout" onPress={logout} />
+          <View style={{ height: theme.spacing.lg }} />
+          <Button title="Logout" onPress={logout} />
+        </View>
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { flex: 1, padding: theme.spacing.lg, backgroundColor: theme.colors.background },
+  screen: { flex: 1 },
+  wrap: { flex: 1, padding: theme.spacing.lg },
   card: {
     padding: theme.spacing.xl,
     borderWidth: theme.card.borderWidth,

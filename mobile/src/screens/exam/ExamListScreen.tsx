@@ -5,6 +5,7 @@ import { examService } from "../../services/exam.service";
 import type { ExamListItem } from "../../types/dtos";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { ExamStackParamList } from "../../navigation/ExamStack";
+import AnimatedAppBackground from "../../components/AnimatedAppBackground";
 
 type Props = NativeStackScreenProps<ExamStackParamList, "ExamList">;
 
@@ -26,7 +27,10 @@ export default function ExamListScreen({ navigation }: Props) {
   }, []);
 
   return (
-    <View style={{ flex: 1, padding: theme.spacing.lg }}>
+    <View style={{ flex: 1 }}>
+      <AnimatedAppBackground />
+
+      <View style={{ flex: 1, padding: theme.spacing.lg }}>
       <FlatList
         data={items}
         keyExtractor={(it) => it.slug}
@@ -47,6 +51,7 @@ export default function ExamListScreen({ navigation }: Props) {
         )}
         ListEmptyComponent={!loading ? <Text>No exams.</Text> : <Text>Loading...</Text>}
       />
+      </View>
     </View>
   );
 }

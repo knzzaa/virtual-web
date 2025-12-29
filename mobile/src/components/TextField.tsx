@@ -17,6 +17,8 @@ export default function TextField({
   autoCapitalize?: "none" | "sentences" | "words" | "characters";
   placeholder?: string;
 }) {
+  const [focused, setFocused] = React.useState(false);
+
   return (
     <View style={{ marginBottom: 12 }}>
       <Text style={styles.label}>{label}</Text>
@@ -27,20 +29,30 @@ export default function TextField({
         autoCapitalize={autoCapitalize}
         placeholder={placeholder}
         placeholderTextColor={"#9ca3af"}
-        style={styles.input}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        style={[styles.input, focused && styles.inputFocused]}
       />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  label: { marginBottom: 6, fontWeight: "700", color: theme.colors.text },
+  label: { marginBottom: 6, fontWeight: "800", color: "#111827" },
   input: {
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.radius.sm,
-    padding: theme.spacing.md,
-    backgroundColor: "#fafafa",
-    color: theme.colors.text,
+    borderColor: "rgba(17, 24, 39, 0.14)",
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    backgroundColor: "rgba(255,255,255,0.88)",
+    color: "#111827",
+  },
+  inputFocused: {
+    borderColor: "rgba(124, 58, 237, 0.7)",
+    shadowColor: "rgba(124, 58, 237, 1)",
+    shadowOpacity: 0.16,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 6 },
   },
 });

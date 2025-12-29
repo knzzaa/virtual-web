@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, ScrollView, Alert, Image, Pressable } from "react-native";
-import Button from "../../components/Button";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import HtmlContent from "../../components/HtmlContent";
 import { materialService } from "../../services/material.service";
 import type { MaterialDetail } from "../../types/dtos";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { MaterialStackParamList } from "../../navigation/MaterialStack";
 import theme from "../../styles/theme";
+import AnimatedAppBackground from "../../components/AnimatedAppBackground";
+import PurpleLights from "../../components/PurpleLights";
 
 type Props = NativeStackScreenProps<MaterialStackParamList, "MaterialDetail">;
 
@@ -14,6 +16,7 @@ export default function MaterialDetailScreen({ route }: Props) {
   const { slug } = route.params;
   const [data, setData] = useState<MaterialDetail | null>(null);
   const [busy, setBusy] = useState(false);
+  const insets = useSafeAreaInsets();
 
   async function load() {
     const res = await materialService.detail(slug);
@@ -37,11 +40,29 @@ export default function MaterialDetailScreen({ route }: Props) {
     }
   }
 
-  if (!data) return <View style={{ padding: theme.spacing.lg }}><Text>Loading...</Text></View>;
+  if (!data)
+    return (
+      <View style={{ flex: 1 }}>
+        <AnimatedAppBackground />
+        <View style={{ padding: theme.spacing.lg, paddingTop: insets.top + theme.spacing.lg }}>
+          <Text style={{ color: "rgba(88, 28, 135, 0.82)" }}>Loading...</Text>
+        </View>
+      </View>
+    );
 
   return (
-    <ScrollView contentContainerStyle={{ padding: theme.spacing.lg }}>
-      <View style={styles.headerCard}>
+    <View style={{ flex: 1 }}>
+      <AnimatedAppBackground />
+      <PurpleLights count={12} />
+
+      <ScrollView
+        contentContainerStyle={{
+          padding: theme.spacing.lg,
+          paddingTop: insets.top + 64, // push content below the transparent header/notch
+          paddingBottom: theme.spacing.xl,
+        }}
+      >
+        <View style={styles.headerCard}>
         <View style={styles.headerRow}>
           <Image source={require("../../../assets/img/books.png")} style={styles.icon} />
           <View style={{ flex: 1 }}>
@@ -54,53 +75,69 @@ export default function MaterialDetailScreen({ route }: Props) {
         <Pressable
           onPress={toggleLike}
           disabled={busy}
-          style={[styles.likeBtn, data.isLikedByUser && styles.likeBtnActive, busy && { opacity: 0.6 }]}
+          style={[styles.likePill, data.isLikedByUser ? styles.likePillActive : styles.likePillIdle, busy && { opacity: 0.6 }]}
         >
-          <Text style={[styles.likeBtnText, data.isLikedByUser && styles.likeBtnTextActive]}>
+          <Text style={[styles.likePillText, data.isLikedByUser ? styles.likePillTextActive : styles.likePillTextIdle]}>
             {data.isLikedByUser ? "♥ Liked" : "♡ Like"}
           </Text>
         </Pressable>
       </View>
 
       <View style={{ height: theme.spacing.lg }} />
+
       <View style={styles.contentCard}>
         <HtmlContent html={data.contentHtml} />
       </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   headerCard: {
-    padding: theme.spacing.lg,
-    borderWidth: theme.card.borderWidth,
-    borderColor: theme.card.borderColor,
-    borderRadius: theme.radius.lg,
-    backgroundColor: theme.colors.card,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.45)",
+    borderRadius: 26,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    shadowColor: "rgba(0,0,0,1)",
+    shadowOpacity: 0.10,
+    shadowRadius: 22,
+    shadowOffset: { width: 0, height: 14 },
   },
   headerRow: { flexDirection: "row", alignItems: "center" },
   icon: { width: 44, height: 44, marginRight: theme.spacing.md },
-  title: { fontSize: 22, fontWeight: "900", color: theme.colors.text },
-  desc: { marginTop: 6, color: theme.colors.muted },
+  title: { fontSize: 18, fontWeight: "800", color: "rgba(88, 28, 135, 0.94)", lineHeight: 24 },
+  desc: { marginTop: 6, color: "rgba(88, 28, 135, 0.72)", lineHeight: 19, fontSize: 13 },
 
-  likeBtn: {
+  likePill: {
     alignSelf: "flex-start",
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.radius.sm,
+    flexDirection: "row",
+    alignItems: "center",
     paddingVertical: 10,
     paddingHorizontal: 14,
-    backgroundColor: "#fff",
+    borderRadius: 999,
+    borderWidth: 1,
+    shadowColor: "rgba(0,0,0,1)",
+    shadowOpacity: 0.10,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 8 },
   },
-  likeBtnActive: { borderColor: "#ef4444", backgroundColor: "#fff5f5" },
-  likeBtnText: { fontWeight: "900", color: theme.colors.text },
-  likeBtnTextActive: { color: "#ef4444" },
+  likePillIdle: { backgroundColor: "rgba(167, 139, 250, 0.10)", borderColor: "rgba(167, 139, 250, 0.22)" },
+  likePillActive: { backgroundColor: "rgba(167, 139, 250, 0.16)", borderColor: "rgba(167, 139, 250, 0.30)" },
+  likePillText: { fontSize: 12, fontWeight: "700" },
+  likePillTextIdle: { color: "rgba(88, 28, 135, 0.76)" },
+  likePillTextActive: { color: "rgba(88, 28, 135, 0.92)" },
 
   contentCard: {
-    padding: theme.spacing.lg,
-    borderWidth: theme.card.borderWidth,
-    borderColor: theme.card.borderColor,
-    borderRadius: theme.radius.lg,
-    backgroundColor: theme.colors.card,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.45)",
+    borderRadius: 26,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    shadowColor: "rgba(0,0,0,1)",
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 12 },
   },
 });

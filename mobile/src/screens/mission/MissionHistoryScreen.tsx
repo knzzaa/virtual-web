@@ -3,6 +3,7 @@ import { View, Text, FlatList, StyleSheet, RefreshControl } from "react-native";
 import { missionService } from "../../services/mission.service";
 import type { MissionCompletionHistoryItem } from "../../types/dtos";
 import theme from "../../styles/theme";
+import AnimatedAppBackground from "../../components/AnimatedAppBackground";
 
 export default function MissionHistoryScreen() {
   const [items, setItems] = useState<MissionCompletionHistoryItem[]>([]);
@@ -23,7 +24,9 @@ export default function MissionHistoryScreen() {
   }, []);
 
   return (
-    <View style={styles.wrap}>
+    <View style={styles.screen}>
+      <AnimatedAppBackground />
+      <View style={styles.wrap}>
       <FlatList
         data={items}
         keyExtractor={(it) => String(it.id)}
@@ -38,11 +41,13 @@ export default function MissionHistoryScreen() {
         )}
         ListEmptyComponent={!loading ? <Text>No history.</Text> : <Text>Loading...</Text>}
       />
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: { flex: 1 },
   wrap: { flex: 1, padding: theme.spacing.lg },
   card: {
     padding: theme.card.padding,
