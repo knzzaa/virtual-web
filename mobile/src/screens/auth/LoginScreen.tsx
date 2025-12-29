@@ -5,7 +5,6 @@ import {
   StyleSheet,
   Alert,
   Pressable,
-  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -19,6 +18,8 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import theme from "../../styles/theme";
 import AnimatedAuthBackground from "../../components/AnimatedAuthBackground";
 import YellowSparkles from "../../components/YellowSparkles";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import AnimatedHeroGlow from "../../components/AnimatedHeroGlow";
 
 type Props = NativeStackScreenProps<AuthStackParamList, "Login">;
 
@@ -27,6 +28,7 @@ export default function LoginScreen({ navigation }: Props) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  const insets = useSafeAreaInsets();
 
   async function onSubmit() {
     setBusy(true);
@@ -52,7 +54,7 @@ export default function LoginScreen({ navigation }: Props) {
         keyboardVerticalOffset={Platform.OS === "ios" ? 24 : 0}
       >
         <ScrollView
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 54 }]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
@@ -92,7 +94,7 @@ export default function LoginScreen({ navigation }: Props) {
             </View>
 
             <View style={styles.panel}>
-              <Image source={require("../../../assets/img/login.png")} style={styles.panelHero} />
+              <AnimatedHeroGlow source={require("../../../assets/img/login.png")} variant="purple" width={240} height={200} />
               <Text style={styles.panelTitle}>Start Your English Journey</Text>
               <Text style={styles.panelSub}>
                 Learn, practice, and master English with our{"\n"}interactive lessons
@@ -117,7 +119,7 @@ const styles = StyleSheet.create({
   },
   formBlock: { padding: theme.spacing.xl },
   brand: { color: "#a78bfa", fontWeight: "900", letterSpacing: 1.5, marginBottom: 8 },
-  title: { fontSize: 30, fontWeight: "900", color: "#111827" },
+  title: { fontSize: 30, fontWeight: "900", color: "#2a0a57" },
   subtitle: { marginTop: 6, color: "#6b7280", lineHeight: 20 },
   dividerRow: { flexDirection: "row", alignItems: "center", marginTop: 12 },
   dividerLine: { flex: 1, height: 1, backgroundColor: "rgba(17, 24, 39, 0.12)" },
@@ -129,7 +131,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  panelHero: { width: 240, height: 200, resizeMode: "contain", marginBottom: 14 },
   panelTitle: { fontSize: 22, fontWeight: "900", color: "#2a0a57", textAlign: "center" },
   panelSub: { marginTop: 8, color: "rgba(17, 24, 39, 0.65)", textAlign: "center", lineHeight: 20 },
   bottomText: { textAlign: "center", color: "#111827" },
