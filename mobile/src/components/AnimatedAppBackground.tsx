@@ -13,8 +13,8 @@ type Props = {
  */
 function AnimatedAppBackgroundBase({ children }: Props) {
   const colors = useMemo(
-    // Static: transparent-ish light purple -> white (white at the bottom)
-    () => ["rgba(167,139,250,0.28)", "rgba(196,181,253,0.20)", "#ffffff"] as const,
+    // Static: soft lavender wash (avoid harsh pure-white at the bottom)
+    () => ["rgba(167,139,250,0.30)", "rgba(196,181,253,0.26)", "rgba(245, 243, 255, 1)"] as const,
     []
   );
 

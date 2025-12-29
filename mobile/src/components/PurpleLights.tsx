@@ -23,13 +23,15 @@ type Light = {
 
 type Props = {
   count?: number;
+  /** Motion speed multiplier. 1 = default. Higher = faster. */
+  speed?: number;
 };
 
 /**
  * Soft moving purple/pink bokeh lights for background decoration.
  * Layer this on top of a gradient background.
  */
-function PurpleLightsBase({ count = 10 }: Props) {
+function PurpleLightsBase({ count = 10, speed = 1 }: Props) {
   const lights = useMemo<Light[]>(() => {
     const arr: Light[] = [];
     for (let i = 0; i < count; i++) {
@@ -51,28 +53,34 @@ function PurpleLightsBase({ count = 10 }: Props) {
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
       {lights.map((l, idx) => (
-        <LightBlob key={idx} l={l} />
+        <LightBlob key={idx} l={l} speed={speed} />
       ))}
     </View>
   );
 }
 
-function LightBlob({ l }: { l: Light }) {
+function LightBlob({ l, speed }: { l: Light; speed: number }) {
   const p = useSharedValue(0);
   const tw = useSharedValue(0);
 
   React.useEffect(() => {
     p.value = withRepeat(
-      withDelay(l.delay, withTiming(1, { duration: 12000, easing: Easing.inOut(Easing.quad) })),
+      withDelay(
+        l.delay,
+        withTiming(1, { duration: Math.max(2400, 12000 / Math.max(0.25, speed)), easing: Easing.inOut(Easing.quad) })
+      ),
       -1,
       true
     );
     tw.value = withRepeat(
-      withDelay(l.delay / 2, withTiming(1, { duration: 4200, easing: Easing.inOut(Easing.quad) })),
+      withDelay(
+        l.delay / 2,
+        withTiming(1, { duration: Math.max(1800, 4200 / Math.max(0.25, speed)), easing: Easing.inOut(Easing.quad) })
+      ),
       -1,
       true
     );
-  }, [p, tw, l.delay]);
+  }, [p, tw, l.delay, speed]);
 
   const style = useAnimatedStyle(() => {
     const dx = interpolate(p.value, [0, 1], [-l.drift, l.drift]);
