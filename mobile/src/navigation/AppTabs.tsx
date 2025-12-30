@@ -71,12 +71,15 @@ function TabItem({
     // The "selected" look should come from highlight + glow, like the reference.
     const hoverScale = 1 + interpolate(h, [0, 1], [0, 0.05]);
     const activeScale = 1 + interpolate(a, [0, 1], [0, 0.10]);
-    const pressScale = 1 - interpolate(p, [0, 1], [0, 0.04]);
+    const pressScale = 1 - interpolate(p, [0, 1], [0, 0.08]);
     const scale = hoverScale * activeScale * pressScale;
+    const pressLift = interpolate(p, [0, 1], [0, -2]);
     return {
-      transform: [{ translateY: lift }, { scale }],
+      transform: [{ translateY: lift + pressLift }, { scale }],
     };
   });
+
+
 
   const iconStyle = useAnimatedStyle(() => {
     const h = hover.value;
@@ -124,8 +127,8 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
             options.tabBarLabel !== undefined
               ? String(options.tabBarLabel)
               : options.title !== undefined
-                ? options.title
-                : route.name;
+              ? options.title
+              : route.name;
 
           const isFocused = state.index === index;
 
@@ -135,7 +138,6 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
               target: route.key,
               canPreventDefault: true,
             });
-
             if (!isFocused && !event.defaultPrevented) {
               navigation.navigate(route.name as any);
             }
@@ -179,26 +181,27 @@ const styles = StyleSheet.create({
     // No extra background layer — let the screen background show through.
     backgroundColor: "transparent",
     // Edge-to-edge so the panel follows iPhone rounded corners (no square block)
-    paddingHorizontal: 10,
-    paddingBottom: Platform.OS === "ios" ? 20 : 14,
-    paddingTop: 10,
+    paddingHorizontal: 0,
+    paddingBottom: Platform.OS === "ios" ? 12 : 8,
+    paddingTop: 0,
   },
   bar: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-  borderRadius: 38,
-  paddingVertical: 14,
-  paddingHorizontal: 16,
+    borderRadius: 38,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
     // Clean glass panel (no purple block)
-    backgroundColor: "rgba(255,255,255,0.92)",
+    backgroundColor: "rgba(255,255,255,0.5)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.75)",
-    shadowColor: "rgba(0,0,0,0.55)",
-    shadowOpacity: 0.14,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 10,
+    borderColor: "rgba(255,255,255,0.4)",
+    shadowColor: "rgba(0,0,0,0.1)",
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+    marginHorizontal: 10,
   },
   tabItem: {
     flex: 1,
@@ -207,7 +210,7 @@ const styles = StyleSheet.create({
   tabItemInner: {
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 6,
+    paddingVertical: 4,
     paddingHorizontal: 10,
     borderRadius: 16,
     minWidth: 64,
@@ -230,14 +233,12 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     resizeMode: "contain",
-    // Keep PNG colors clear. If your icons are monochrome, we can re-enable tint.
-    tintColor: undefined,
   },
   iconActive: {
     tintColor: undefined,
   },
   label: {
-    marginTop: 6,
+    marginTop: 4,
     fontSize: 12,
     fontWeight: "800",
     color: "rgba(88, 28, 135, 0.80)",
@@ -250,7 +251,7 @@ const styles = StyleSheet.create({
     height: 6,
     borderRadius: 999,
     backgroundColor: "rgba(88, 28, 135, 0.30)",
-    marginTop: 8,
+    marginTop: 4,
   },
-  indicatorSpacer: { width: 22, height: 6, marginTop: 8, opacity: 0 },
+  indicatorSpacer: { width: 22, height: 6, marginTop: 4, opacity: 0 },
 });

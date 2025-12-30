@@ -31,7 +31,10 @@ function getYouTubeIdFromEmbed(embedUrl: string) {
 
 function YouTubeCard({ src, width }: { src: string; width: number }) {
   // Keep the video smaller so it looks neat inside the detail layout.
-  const cardWidth = Math.min(width, 360);
+  // Make the card a bit narrower than screen and cap its max width for neat layout.
+  const maxCardWidth = 320;
+  const horizontalInset = 48; // leave padding left/right so it doesn't touch edges
+  const cardWidth = Math.min(Math.max(width - horizontalInset, 220), maxCardWidth);
   const height = Math.round((cardWidth * 9) / 16);
   const [failed, setFailed] = useState(false);
   const videoId = getYouTubeIdFromEmbed(src);
