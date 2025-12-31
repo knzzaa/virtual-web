@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -7,14 +7,14 @@ import {
   Alert,
   Image,
   ActivityIndicator,
+  FlatList,
   SafeAreaView,
-  ScrollView,
-  Platform,
-  Animated,
 } from "react-native";
+import type { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
+
 import { missionService } from "../../services/mission.service";
 import type { MissionNextResponse } from "../../types/dtos";
-import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { MissionStackParamList } from "../../navigation/MissionStack";
 import theme from "../../styles/theme";
 import AnimatedAppBackground from "../../components/AnimatedAppBackground";
@@ -23,64 +23,54 @@ type Props = NativeStackScreenProps<MissionStackParamList, "MissionNext">;
 
 type ImgState = Record<number, { loading: boolean; error: boolean }>;
 
-type ToastType = "success" | "error";
-
 export default function MissionNextScreen({ navigation, route }: Props) {
-  // ✅ Hindari useBottomTabBarHeight (yang bikin warning hook)
-  const TABBAR_ESTIMATE = Platform.OS === "ios" ? 84 : 64;
+  const tabBarHeight = useBottomTabBarHeight();
 
-  // route param optional (biar aman walau type belum diupdate)
-  const initialData = (route.params as any)?.initialData as MissionNextResponse | undefined;
-
-  const [data, setData] = useState<MissionNextResponse | null>(() => initialData ?? null);
+  const [data, setData] = useState<MissionNextResponse | null>(() => route.params?.initialData ?? null);
   const [busy, setBusy] = useState(false);
 
-  // UI state
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [locked, setLocked] = useState(false);
   const [pendingNextQuestion, setPendingNextQuestion] = useState<any | null>(null);
   const [pendingScore, setPendingScore] = useState<number | null>(null);
   const [feedback, setFeedback] = useState<{ correctOptionIndex?: number; isCorrect?: boolean } | null>(null);
+
   const [imgState, setImgState] = useState<ImgState>({});
 
-  // Toast
-  const [toast, setToast] = useState<{ type: ToastType; text: string } | null>(null);
-  const toastAnim = useRef(new Animated.Value(0)).current;
-
+  const q = useMemo(() => (data as any)?.currentQuestion ?? null, [data]);
   const mission = (data as any)?.mission ?? null;
   const progress = (data as any)?.progress ?? null;
 
-  const q = useMemo(() => (data as any)?.currentQuestion ?? null, [data]);
-
-  const optionRaw = useMemo(() => {
-    const opts: unknown = q?.options;
-    return Array.isArray(opts) ? opts : [];
-  }, [q]);
-
   const optionImages = useMemo(() => {
-    return optionRaw.filter((o): o is string => typeof o === "string");
-  }, [optionRaw]);
+    const opts: unknown = q?.options;
+    if (!Array.isArray(opts)) return [] as string[];
+    return opts.filter((o): o is string => typeof o === "string");
+  }, [q]);
 
   const isImageMode = useMemo(() => {
     return optionImages.length > 0 && optionImages.every((o) => /^https?:\/\//.test(o));
   }, [optionImages]);
 
-  // reset UI per question
+  const correctIdx = feedback?.correctOptionIndex;
+
+  const evaluatedIsCorrect = useMemo(() => {
+    if (!locked) return undefined;
+    if (typeof feedback?.isCorrect === "boolean") return feedback.isCorrect;
+    if (typeof correctIdx === "number" && typeof selectedIndex === "number") return selectedIndex === correctIdx;
+    return undefined;
+  }, [locked, feedback?.isCorrect, correctIdx, selectedIndex]);
+
+  // reset UI when question changes
   useEffect(() => {
     const qn = (q as any)?.questionNumber;
     if (!qn) return;
-
     setSelectedIndex(null);
     setLocked(false);
     setPendingNextQuestion(null);
     setPendingScore(null);
     setFeedback(null);
     setImgState({});
-    setToast(null);
-
-    // reset anim
-    toastAnim.setValue(0);
-  }, [q, toastAnim]);
+  }, [q]);
 
   async function load() {
     const res = await missionService.next();
@@ -88,28 +78,13 @@ export default function MissionNextScreen({ navigation, route }: Props) {
   }
 
   useEffect(() => {
-    if (!initialData) load();
+    if (!route.params?.initialData) load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function showToast(type: ToastType, text: string) {
-    setToast({ type, text });
-    toastAnim.stopAnimation();
-    toastAnim.setValue(0);
-
-    Animated.timing(toastAnim, {
-      toValue: 1,
-      duration: 180,
-      useNativeDriver: true,
-    }).start(() => {
-      setTimeout(() => {
-        Animated.timing(toastAnim, {
-          toValue: 0,
-          duration: 220,
-          useNativeDriver: true,
-        }).start(() => setToast(null));
-      }, 900);
-    });
+  function buildGridData<T extends { id: string }>(items: T[]) {
+    if (items.length % 2 === 1) return [...items, { id: "__spacer__" } as T];
+    return items;
   }
 
   async function answer(selectedOptionIndex: number) {
@@ -129,20 +104,17 @@ export default function MissionNextScreen({ navigation, route }: Props) {
         selectedOptionIndex,
       });
 
-      const correctOptionIndex =
+      const nextCorrectIndex =
         typeof res?.correctOptionIndex === "number" ? res.correctOptionIndex : undefined;
 
-      const isCorrect =
+      const nextIsCorrect =
         typeof res?.isCorrect === "boolean"
           ? res.isCorrect
-          : correctOptionIndex !== undefined
-            ? selectedOptionIndex === correctOptionIndex
+          : nextCorrectIndex !== undefined
+            ? selectedOptionIndex === nextCorrectIndex
             : undefined;
 
-      setFeedback({ correctOptionIndex, isCorrect });
-
-      if (isCorrect === true) showToast("success", "Excellent!");
-      else if (isCorrect === false) showToast("error", "Wrong :(");
+      setFeedback({ correctOptionIndex: nextCorrectIndex, isCorrect: nextIsCorrect });
 
       if (res.completed) {
         navigation.navigate("MissionResult", {
@@ -151,7 +123,6 @@ export default function MissionNextScreen({ navigation, route }: Props) {
           totalQuestions: res.totalQuestions ?? 0,
         });
 
-        // refresh for next mission
         const next = await missionService.next();
         setData(next);
         return;
@@ -190,7 +161,6 @@ export default function MissionNextScreen({ navigation, route }: Props) {
     } as any);
   }
 
-  // loading state
   if (!data) {
     return (
       <View style={{ flex: 1 }}>
@@ -221,6 +191,7 @@ export default function MissionNextScreen({ navigation, route }: Props) {
             </View>
 
             <View style={{ height: theme.spacing.md }} />
+
             <Pressable style={styles.link} onPress={() => navigation.navigate("MissionHistory")}>
               <Text style={styles.linkTxt}>View completion history</Text>
             </Pressable>
@@ -249,67 +220,60 @@ export default function MissionNextScreen({ navigation, route }: Props) {
   const pct = totalQ ? Math.min(1, q.questionNumber / totalQ) : 0;
   const pctLabel = `${Math.round(pct * 100)}%`;
 
-  const correctIdx = feedback?.correctOptionIndex;
+  const imageItems = useMemo(() => {
+    return buildGridData(optionImages.map((uri, idx) => ({ id: String(idx), uri, idx })));
+  }, [optionImages]);
+
+  const textItems = useMemo(() => {
+    const opts: unknown = q?.options;
+    const arr = Array.isArray(opts) ? opts : [];
+    return arr.map((val: any, idx: number) => ({ id: String(idx), label: String(val), idx }));
+  }, [q]);
 
   const canNext = locked && !!pendingNextQuestion && !busy;
 
-  // --- UI helpers
-  function getOptionState(idx: number) {
-    const selected = selectedIndex === idx;
+  const Footer = (
+    <View style={[styles.footer, { paddingBottom: tabBarHeight + 14 }]}>
+      {/* feedback banner (web-like) */}
+      {locked && evaluatedIsCorrect !== undefined ? (
+        <View
+          style={[
+            styles.feedbackBanner,
+            evaluatedIsCorrect ? styles.feedbackSuccess : styles.feedbackError,
+          ]}
+        >
+          <Text style={styles.feedbackIcon}>{evaluatedIsCorrect ? "✓" : "✕"}</Text>
+          <Text style={styles.feedbackText}>
+            {evaluatedIsCorrect ? "Excellent!" : "Wrong :("}
+          </Text>
+        </View>
+      ) : null}
 
-    const hasCorrectIndex = typeof correctIdx === "number";
-    const isCorrectOption = hasCorrectIndex ? idx === correctIdx : undefined;
-    const isSelectedWrong = hasCorrectIndex ? selected && idx !== correctIdx : undefined;
+      <Pressable
+        style={[
+          styles.nextBtn,
+          (!locked || busy) && { opacity: 0.55 },
+          locked && !pendingNextQuestion && !busy && { opacity: 0.75 },
+        ]}
+        disabled={!locked || busy || !pendingNextQuestion}
+        onPress={goNext}
+      >
+        <Text style={styles.nextText}>
+          {busy ? "Submitting..." : pendingNextQuestion ? "Next" : "Select an answer"}
+        </Text>
+      </Pressable>
 
-    const onlyBool = !hasCorrectIndex && feedback?.isCorrect !== undefined;
-    const selectedIsCorrectByBool = onlyBool ? (selected ? feedback?.isCorrect : undefined) : undefined;
+      <View style={{ height: 8 }} />
 
-    return {
-      selected,
-      isCorrectOption,
-      isSelectedWrong,
-      selectedIsCorrectByBool,
-    };
-  }
+      <Pressable style={styles.link} onPress={() => navigation.navigate("MissionHistory")}>
+        <Text style={styles.linkTxt}>View completion history</Text>
+      </Pressable>
 
-  function renderBadge(idx: number) {
-    if (!locked) return null;
-
-    const s = getOptionState(idx);
-
-    // if API gives correctOptionIndex:
-    if (typeof correctIdx === "number") {
-      if (s.isCorrectOption) return <Pill type="success" text="Correct" />;
-      if (s.isSelectedWrong) return <Pill type="error" text="Wrong" />;
-      return null;
-    }
-
-    // fallback by boolean only (badge only for selected)
-    if (s.selectedIsCorrectByBool === true) return <Pill type="success" text="Correct" />;
-    if (s.selectedIsCorrectByBool === false) return <Pill type="error" text="Wrong" />;
-    return null;
-  }
-
-  function optionStyle(idx: number) {
-    const s = getOptionState(idx);
-
-    const base = [styles.optCard] as any[];
-
-    if (s.selected) base.push(styles.optSelected);
-
-    if (locked && typeof correctIdx === "number") {
-      if (s.isCorrectOption) base.push(styles.optCorrect);
-      if (s.isSelectedWrong) base.push(styles.optWrong);
-    } else if (locked && s.selected && feedback?.isCorrect === true) {
-      base.push(styles.optCorrect);
-    } else if (locked && s.selected && feedback?.isCorrect === false) {
-      base.push(styles.optWrong);
-    }
-
-    if (busy || locked) base.push({ opacity: 0.92 });
-
-    return base;
-  }
+      <Pressable style={styles.link} onPress={() => navigation.navigate("MissionHome")}>
+        <Text style={styles.linkTxt}>Back to Mission Home</Text>
+      </Pressable>
+    </View>
+  );
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -342,166 +306,149 @@ export default function MissionNextScreen({ navigation, route }: Props) {
 
         <View style={{ height: theme.spacing.lg }} />
 
-        {/* QUESTION CARD (web-like) */}
+        {/* QUESTION (web-like card) */}
         <View style={styles.questionCard}>
           <Text style={styles.qText}>{q.questionText}</Text>
-
           <Text style={styles.hintText}>
-            Tap one option to answer{canNext ? ", then press Next." : "."}
+            Tap one option to answer{canNext ? ", then press Next" : ""}.
           </Text>
         </View>
 
-        <View style={{ height: theme.spacing.lg }} />
+        <View style={{ height: 12 }} />
 
         {/* OPTIONS */}
-        <ScrollView
-          contentContainerStyle={{ paddingBottom: TABBAR_ESTIMATE + 140 }}
-          showsVerticalScrollIndicator={false}
-        >
-          {isImageMode ? (
-            <View style={styles.grid}>
-              {optionImages.map((uri, idx) => {
-                const colCount = 2;
-                const isLastSingle =
-                  optionImages.length % colCount === 1 && idx === optionImages.length - 1;
+        {isImageMode ? (
+          <FlatList
+            data={imageItems}
+            keyExtractor={(it) => it.id}
+            numColumns={2}
+            columnWrapperStyle={{ gap: 12 }}
+            contentContainerStyle={{ gap: 12 }}
+            ListFooterComponent={Footer}
+            renderItem={({ item }: any) => {
+              if (item.id === "__spacer__") return <View style={{ flex: 1 }} />;
 
-                return (
-                  <Pressable
-                    key={String(idx)}
-                    style={[
-                      optionStyle(idx),
-                      styles.optImageWrap,
-                      isLastSingle && styles.optLastSingleCentered,
-                    ]}
-                    onPress={() => answer(idx)}
-                    disabled={busy || locked}
-                  >
-                    <Image
-                      source={{ uri }}
-                      style={styles.optImage}
-                      resizeMode="cover"
-                      onLoadStart={() =>
-                        setImgState((prev) => ({
-                          ...prev,
-                          [idx]: { loading: true, error: prev[idx]?.error ?? false },
-                        }))
-                      }
-                      onLoadEnd={() =>
-                        setImgState((prev) => ({
-                          ...prev,
-                          [idx]: { loading: false, error: prev[idx]?.error ?? false },
-                        }))
-                      }
-                      onError={() =>
-                        setImgState((prev) => ({
-                          ...prev,
-                          [idx]: { loading: false, error: true },
-                        }))
-                      }
-                    />
+              const idx: number = item.idx;
+              const uri: string = item.uri;
 
-                    {imgState[idx]?.loading ? (
-                      <View style={styles.imgOverlay}>
-                        <ActivityIndicator />
-                        <Text style={styles.imgOverlayText}>Loading…</Text>
-                      </View>
-                    ) : null}
+              const selected = selectedIndex === idx;
 
-                    {imgState[idx]?.error ? (
-                      <View style={styles.imgOverlay}>
-                        <Text style={styles.imgOverlayText}>Failed to load</Text>
-                      </View>
-                    ) : null}
+              const showCorrect = locked && typeof correctIdx === "number" && idx === correctIdx;
+              const showWrong =
+                locked &&
+                typeof correctIdx === "number" &&
+                selectedIndex === idx &&
+                idx !== correctIdx;
 
-                    <View style={styles.badgeWrap}>{renderBadge(idx)}</View>
-                  </Pressable>
-                );
-              })}
-            </View>
-          ) : (
-            <View style={{ gap: 10 }}>
-              {optionRaw.map((val: any, idx: number) => (
+              const showOnlySelected =
+                locked && typeof correctIdx !== "number" && selected && feedback?.isCorrect !== undefined;
+
+              const showCheck = showCorrect || (showOnlySelected && feedback?.isCorrect === true);
+              const showCross = showWrong || (showOnlySelected && feedback?.isCorrect === false);
+
+              return (
                 <Pressable
-                  key={String(idx)}
-                  style={[optionStyle(idx), styles.optTextWrap]}
+                  style={[
+                    styles.imgOpt,
+                    selected && styles.optSelected,
+                    showCorrect && styles.optCorrect,
+                    showWrong && styles.optWrong,
+                    busy && { opacity: 0.7 },
+                  ]}
                   onPress={() => answer(idx)}
                   disabled={busy || locked}
                 >
-                  <Text style={styles.optTxt}>{String(val)}</Text>
-                  <View style={styles.badgeWrapInline}>{renderBadge(idx)}</View>
+                  <Image
+                    source={{ uri }}
+                    style={styles.img}
+                    resizeMode="cover"
+                    onLoadStart={() =>
+                      setImgState((prev) => ({
+                        ...prev,
+                        [idx]: { loading: true, error: prev[idx]?.error ?? false },
+                      }))
+                    }
+                    onLoadEnd={() =>
+                      setImgState((prev) => ({
+                        ...prev,
+                        [idx]: { loading: false, error: prev[idx]?.error ?? false },
+                      }))
+                    }
+                    onError={() =>
+                      setImgState((prev) => ({ ...prev, [idx]: { loading: false, error: true } }))
+                    }
+                  />
+
+                  {imgState[idx]?.loading ? (
+                    <View style={styles.imgOverlay}>
+                      <ActivityIndicator />
+                      <Text style={styles.imgOverlayText}>Loading…</Text>
+                    </View>
+                  ) : null}
+
+                  {imgState[idx]?.error ? (
+                    <View style={styles.imgOverlay}>
+                      <Text style={styles.imgOverlayText}>Failed to load</Text>
+                    </View>
+                  ) : null}
+
+                  {(showCheck || showCross) && (
+                    <View style={[styles.cornerBadge, showCheck ? styles.cornerOk : styles.cornerBad]}>
+                      <Text style={styles.cornerBadgeText}>{showCheck ? "✓" : "✕"}</Text>
+                    </View>
+                  )}
+
+                  {locked && (showCorrect || showWrong || showOnlySelected) ? (
+                    <View style={styles.badge}>
+                      <Text style={styles.badgeText}>
+                        {showCorrect
+                          ? "Correct"
+                          : showWrong
+                            ? "Wrong"
+                            : feedback?.isCorrect
+                              ? "Correct"
+                              : "Wrong"}
+                      </Text>
+                    </View>
+                  ) : null}
                 </Pressable>
-              ))}
-            </View>
-          )}
+              );
+            }}
+          />
+        ) : (
+          <FlatList
+            data={textItems}
+            keyExtractor={(it) => it.id}
+            contentContainerStyle={{ gap: 10 }}
+            ListFooterComponent={Footer}
+            renderItem={({ item }: any) => {
+              const idx: number = item.idx;
+              const selected = selectedIndex === idx;
 
-          <View style={{ height: theme.spacing.md }} />
+              const showCorrect = locked && typeof correctIdx === "number" && idx === correctIdx;
+              const showWrong =
+                locked && typeof correctIdx === "number" && selectedIndex === idx && idx !== correctIdx;
 
-          {/* links */}
-          <Pressable style={styles.link} onPress={() => navigation.navigate("MissionHistory")}>
-            <Text style={styles.linkTxt}>View completion history</Text>
-          </Pressable>
-
-          <Pressable style={styles.link} onPress={() => navigation.navigate("MissionHome")}>
-            <Text style={styles.linkTxt}>Back to Mission Home</Text>
-          </Pressable>
-        </ScrollView>
-      </View>
-
-      {/* Toast like web */}
-      {toast ? (
-        <Animated.View
-          style={[
-            styles.toast,
-            toast.type === "success" ? styles.toastSuccess : styles.toastError,
-            {
-              transform: [
-                {
-                  translateY: toastAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [18, 0],
-                  }),
-                },
-              ],
-              opacity: toastAnim,
-              bottom: TABBAR_ESTIMATE + 86,
-            },
-          ]}
-          pointerEvents="none"
-        >
-          <Text style={styles.toastIcon}>{toast.type === "success" ? "✓" : "✕"}</Text>
-          <Text style={styles.toastText}>{toast.text}</Text>
-        </Animated.View>
-      ) : null}
-
-      {/* Bottom Fixed CTA */}
-      <View style={[styles.bottomCta, { bottom: TABBAR_ESTIMATE + 14 }]}>
-        <Pressable
-          style={[
-            styles.nextBtn,
-            (!locked || busy) && { opacity: 0.55 },
-            locked && !pendingNextQuestion && !busy && { opacity: 0.7 },
-          ]}
-          disabled={!locked || busy || !pendingNextQuestion}
-          onPress={goNext}
-        >
-          <Text style={styles.nextText}>
-            {busy ? "Submitting..." : pendingNextQuestion ? "Next" : "Select an answer"}
-          </Text>
-        </Pressable>
+              return (
+                <Pressable
+                  style={[
+                    styles.opt,
+                    selected && styles.optSelected,
+                    showCorrect && styles.optCorrect,
+                    showWrong && styles.optWrong,
+                    busy && { opacity: 0.7 },
+                  ]}
+                  onPress={() => answer(idx)}
+                  disabled={busy || locked}
+                >
+                  <Text style={styles.optTxt}>{item.label}</Text>
+                </Pressable>
+              );
+            }}
+          />
+        )}
       </View>
     </SafeAreaView>
-  );
-}
-
-/** Small pill for Correct/Wrong */
-function Pill({ type, text }: { type: ToastType; text: string }) {
-  const bg = type === "success" ? "#D1FAE5" : "#FEE2E2";
-  const fg = type === "success" ? "#065F46" : "#991B1B";
-  const bd = type === "success" ? "#34D399" : "#F87171";
-  return (
-    <View style={[styles.pill, { backgroundColor: bg, borderColor: bd }]}>
-      <Text style={[styles.pillText, { color: fg }]}>{text}</Text>
-    </View>
   );
 }
 
@@ -539,7 +486,7 @@ const styles = StyleSheet.create({
   },
 
   questionCard: {
-    padding: theme.spacing.lg,
+    padding: theme.spacing.md,
     borderRadius: theme.radius.lg,
     borderWidth: 1,
     borderColor: theme.colors.border,
@@ -547,7 +494,7 @@ const styles = StyleSheet.create({
   },
   qText: { fontSize: 16, fontWeight: "900", color: theme.colors.text, textAlign: "center" },
   hintText: {
-    marginTop: 8,
+    marginTop: 6,
     fontSize: 12,
     color: theme.colors.muted,
     fontWeight: "700",
@@ -555,74 +502,92 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 
-  // grid options
-  grid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-
-  optCard: {
-    borderRadius: theme.radius.lg,
+  // text option
+  opt: {
+    padding: theme.spacing.md,
+    borderRadius: theme.radius.md,
     borderWidth: 1,
     borderColor: theme.colors.border,
     backgroundColor: theme.colors.card,
-    overflow: "hidden",
   },
-  optSelected: { borderColor: theme.colors.accent, borderWidth: 2 },
+  optTxt: { fontWeight: "800", color: theme.colors.text },
 
-  optCorrect: { borderColor: "#16A34A", borderWidth: 2 },
-  optWrong: { borderColor: "#DC2626", borderWidth: 2 },
-
-  optImageWrap: {
-    width: "48%",
+  // image option
+  imgOpt: {
+    flex: 1,
     aspectRatio: 1,
-    position: "relative",
+    borderRadius: theme.radius.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    overflow: "hidden",
+    backgroundColor: "#f3f4f6",
   },
-  optLastSingleCentered: {
-    width: "48%",
-    alignSelf: "center",
-  },
-
-  optImage: { width: "100%", height: "100%" },
+  img: { width: "100%", height: "100%" },
 
   imgOverlay: {
     position: "absolute",
     inset: 0,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.55)",
+    backgroundColor: "rgba(255,255,255,0.45)",
   },
   imgOverlayText: { marginTop: 8, fontWeight: "900", color: theme.colors.text },
 
-  badgeWrap: {
+  // states
+  optSelected: { borderColor: theme.colors.accent, borderWidth: 2 },
+  optCorrect: { borderColor: "#16A34A", borderWidth: 2 },
+  optWrong: { borderColor: "#DC2626", borderWidth: 2 },
+
+  badge: {
     position: "absolute",
     left: 10,
     bottom: 10,
-  },
-
-  optTextWrap: {
-    padding: theme.spacing.md,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  optTxt: { fontWeight: "900", color: theme.colors.text, flex: 1, paddingRight: 10 },
-  badgeWrapInline: { marginLeft: 8 },
-
-  pill: {
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 999,
+    backgroundColor: "rgba(0,0,0,0.55)",
+  },
+  badgeText: { color: "white", fontWeight: "900", fontSize: 12 },
+
+  cornerBadge: {
+    position: "absolute",
+    right: 10,
+    top: 10,
+    width: 28,
+    height: 28,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cornerOk: { backgroundColor: "rgba(22,163,74,0.92)" },
+  cornerBad: { backgroundColor: "rgba(220,38,38,0.92)" },
+  cornerBadgeText: { color: "white", fontWeight: "900" },
+
+  footer: {
+    marginTop: theme.spacing.lg,
+    gap: 10,
+  },
+
+  feedbackBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderRadius: theme.radius.lg,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
     borderWidth: 1,
   },
-  pillText: { fontWeight: "900", fontSize: 12 },
+  feedbackSuccess: {
+    backgroundColor: "rgba(22,163,74,0.12)",
+    borderColor: "rgba(22,163,74,0.30)",
+  },
+  feedbackError: {
+    backgroundColor: "rgba(220,38,38,0.12)",
+    borderColor: "rgba(220,38,38,0.30)",
+  },
+  feedbackIcon: { fontWeight: "900", fontSize: 16, color: theme.colors.text },
+  feedbackText: { fontWeight: "900", color: theme.colors.text },
 
-  link: { paddingVertical: 8 },
-  linkTxt: { fontWeight: "900", color: theme.colors.accent },
-
-  bottomCta: { position: "absolute", left: theme.spacing.lg, right: theme.spacing.lg },
   nextBtn: {
     paddingVertical: 14,
     borderRadius: theme.radius.lg,
@@ -631,20 +596,6 @@ const styles = StyleSheet.create({
   },
   nextText: { color: "white", fontWeight: "900" },
 
-  toast: {
-    position: "absolute",
-    left: theme.spacing.lg,
-    right: theme.spacing.lg,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderRadius: theme.radius.lg,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    borderWidth: 1,
-  },
-  toastSuccess: { backgroundColor: "#ECFDF5", borderColor: "#34D399" },
-  toastError: { backgroundColor: "#FEF2F2", borderColor: "#F87171" },
-  toastIcon: { fontWeight: "900", fontSize: 16, color: theme.colors.text },
-  toastText: { fontWeight: "900", color: theme.colors.text },
+  link: { paddingVertical: 6 },
+  linkTxt: { fontWeight: "900", color: theme.colors.accent },
 });
