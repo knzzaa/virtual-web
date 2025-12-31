@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -7,8 +7,10 @@ import {
   Alert,
   Image,
   ActivityIndicator,
-  FlatList,
   SafeAreaView,
+  ScrollView,
+  Platform,
+  Animated,
 } from "react-native";
 import { missionService } from "../../services/mission.service";
 import type { MissionNextResponse } from "../../types/dtos";
@@ -17,87 +19,97 @@ import type { MissionStackParamList } from "../../navigation/MissionStack";
 import theme from "../../styles/theme";
 import AnimatedAppBackground from "../../components/AnimatedAppBackground";
 
-// NOTE: Jangan panggil hook conditional.
-// Kita bikin wrapper yang aman: kalau paketnya ga ada, height = 0.
-let useBottomTabBarHeightFn: null | (() => number) = null;
-try {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  useBottomTabBarHeightFn = require("@react-navigation/bottom-tabs").useBottomTabBarHeight;
-} catch {
-  useBottomTabBarHeightFn = null;
-}
-
 type Props = NativeStackScreenProps<MissionStackParamList, "MissionNext">;
 
 type ImgState = Record<number, { loading: boolean; error: boolean }>;
 
-export default function MissionNextScreen({ navigation, route }: Props) {
-  // ✅ hooks MUST be stable: always call useState/useMemo/useEffect in same order.
-  // Untuk tabBarHeight: kalau fn-nya ga ada, set 0 via state supaya nggak conditional hook.
-  const [tabBarHeight] = useState(() => {
-    try {
-      return useBottomTabBarHeightFn ? useBottomTabBarHeightFn() : 0;
-    } catch {
-      return 0;
-    }
-  });
+type ToastType = "success" | "error";
 
-  const [data, setData] = useState<MissionNextResponse | null>(() => route.params?.initialData ?? null);
+export default function MissionNextScreen({ navigation, route }: Props) {
+  // ✅ Hindari useBottomTabBarHeight (yang bikin warning hook)
+  const TABBAR_ESTIMATE = Platform.OS === "ios" ? 84 : 64;
+
+  // route param optional (biar aman walau type belum diupdate)
+  const initialData = (route.params as any)?.initialData as MissionNextResponse | undefined;
+
+  const [data, setData] = useState<MissionNextResponse | null>(() => initialData ?? null);
   const [busy, setBusy] = useState(false);
 
-  // UI/UX states
+  // UI state
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [locked, setLocked] = useState(false);
   const [pendingNextQuestion, setPendingNextQuestion] = useState<any | null>(null);
   const [pendingScore, setPendingScore] = useState<number | null>(null);
   const [feedback, setFeedback] = useState<{ correctOptionIndex?: number; isCorrect?: boolean } | null>(null);
-
   const [imgState, setImgState] = useState<ImgState>({});
 
-  // Derive current question safely
-  const q = useMemo(() => {
-    return (data as any)?.currentQuestion ?? null;
-  }, [data]);
+  // Toast
+  const [toast, setToast] = useState<{ type: ToastType; text: string } | null>(null);
+  const toastAnim = useRef(new Animated.Value(0)).current;
 
   const mission = (data as any)?.mission ?? null;
   const progress = (data as any)?.progress ?? null;
 
-  const optionImages = useMemo(() => {
+  const q = useMemo(() => (data as any)?.currentQuestion ?? null, [data]);
+
+  const optionRaw = useMemo(() => {
     const opts: unknown = q?.options;
-    if (!Array.isArray(opts)) return [] as string[];
-    return opts.filter((o): o is string => typeof o === "string");
+    return Array.isArray(opts) ? opts : [];
   }, [q]);
+
+  const optionImages = useMemo(() => {
+    return optionRaw.filter((o): o is string => typeof o === "string");
+  }, [optionRaw]);
 
   const isImageMode = useMemo(() => {
     return optionImages.length > 0 && optionImages.every((o) => /^https?:\/\//.test(o));
   }, [optionImages]);
 
-  // Reset UI states when question changes
+  // reset UI per question
   useEffect(() => {
     const qn = (q as any)?.questionNumber;
     if (!qn) return;
+
     setSelectedIndex(null);
     setLocked(false);
     setPendingNextQuestion(null);
     setPendingScore(null);
     setFeedback(null);
     setImgState({});
-  }, [q]);
+    setToast(null);
+
+    // reset anim
+    toastAnim.setValue(0);
+  }, [q, toastAnim]);
 
   async function load() {
     const res = await missionService.next();
     setData(res);
   }
 
-  // ✅ only fetch if no initialData
   useEffect(() => {
-    if (!route.params?.initialData) load();
+    if (!initialData) load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function buildGridData<T extends { id: string }>(items: T[]) {
-    if (items.length % 2 === 1) return [...items, { id: "__spacer__" } as T];
-    return items;
+  function showToast(type: ToastType, text: string) {
+    setToast({ type, text });
+    toastAnim.stopAnimation();
+    toastAnim.setValue(0);
+
+    Animated.timing(toastAnim, {
+      toValue: 1,
+      duration: 180,
+      useNativeDriver: true,
+    }).start(() => {
+      setTimeout(() => {
+        Animated.timing(toastAnim, {
+          toValue: 0,
+          duration: 220,
+          useNativeDriver: true,
+        }).start(() => setToast(null));
+      }, 900);
+    });
   }
 
   async function answer(selectedOptionIndex: number) {
@@ -128,6 +140,9 @@ export default function MissionNextScreen({ navigation, route }: Props) {
             : undefined;
 
       setFeedback({ correctOptionIndex, isCorrect });
+
+      if (isCorrect === true) showToast("success", "Excellent!");
+      else if (isCorrect === false) showToast("error", "Wrong :(");
 
       if (res.completed) {
         navigation.navigate("MissionResult", {
@@ -175,6 +190,7 @@ export default function MissionNextScreen({ navigation, route }: Props) {
     } as any);
   }
 
+  // loading state
   if (!data) {
     return (
       <View style={{ flex: 1 }}>
@@ -235,17 +251,65 @@ export default function MissionNextScreen({ navigation, route }: Props) {
 
   const correctIdx = feedback?.correctOptionIndex;
 
-  const imageItems = useMemo(() => {
-    return buildGridData(optionImages.map((uri, idx) => ({ id: String(idx), uri, idx })));
-  }, [optionImages]);
-
-  const textItems = useMemo(() => {
-    const opts: unknown = q?.options;
-    const arr = Array.isArray(opts) ? opts : [];
-    return arr.map((val: any, idx: number) => ({ id: String(idx), label: String(val), idx }));
-  }, [q]);
-
   const canNext = locked && !!pendingNextQuestion && !busy;
+
+  // --- UI helpers
+  function getOptionState(idx: number) {
+    const selected = selectedIndex === idx;
+
+    const hasCorrectIndex = typeof correctIdx === "number";
+    const isCorrectOption = hasCorrectIndex ? idx === correctIdx : undefined;
+    const isSelectedWrong = hasCorrectIndex ? selected && idx !== correctIdx : undefined;
+
+    const onlyBool = !hasCorrectIndex && feedback?.isCorrect !== undefined;
+    const selectedIsCorrectByBool = onlyBool ? (selected ? feedback?.isCorrect : undefined) : undefined;
+
+    return {
+      selected,
+      isCorrectOption,
+      isSelectedWrong,
+      selectedIsCorrectByBool,
+    };
+  }
+
+  function renderBadge(idx: number) {
+    if (!locked) return null;
+
+    const s = getOptionState(idx);
+
+    // if API gives correctOptionIndex:
+    if (typeof correctIdx === "number") {
+      if (s.isCorrectOption) return <Pill type="success" text="Correct" />;
+      if (s.isSelectedWrong) return <Pill type="error" text="Wrong" />;
+      return null;
+    }
+
+    // fallback by boolean only (badge only for selected)
+    if (s.selectedIsCorrectByBool === true) return <Pill type="success" text="Correct" />;
+    if (s.selectedIsCorrectByBool === false) return <Pill type="error" text="Wrong" />;
+    return null;
+  }
+
+  function optionStyle(idx: number) {
+    const s = getOptionState(idx);
+
+    const base = [styles.optCard] as any[];
+
+    if (s.selected) base.push(styles.optSelected);
+
+    if (locked && typeof correctIdx === "number") {
+      if (s.isCorrectOption) base.push(styles.optCorrect);
+      if (s.isSelectedWrong) base.push(styles.optWrong);
+    } else if (locked && s.selected && feedback?.isCorrect === true) {
+      base.push(styles.optCorrect);
+    } else if (locked && s.selected && feedback?.isCorrect === false) {
+      base.push(styles.optWrong);
+    }
+
+    if (busy || locked) base.push({ opacity: 0.92 });
+
+    return base;
+  }
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -278,146 +342,139 @@ export default function MissionNextScreen({ navigation, route }: Props) {
 
         <View style={{ height: theme.spacing.lg }} />
 
-        {/* QUESTION */}
-        <Text style={styles.qText}>{q.questionText}</Text>
-        <Text style={styles.hintText}>Tap one option to answer{canNext ? ", then press Next" : ""}.</Text>
+        {/* QUESTION CARD (web-like) */}
+        <View style={styles.questionCard}>
+          <Text style={styles.qText}>{q.questionText}</Text>
 
-        <View style={{ height: 12 }} />
+          <Text style={styles.hintText}>
+            Tap one option to answer{canNext ? ", then press Next." : "."}
+          </Text>
+        </View>
 
-        {/* CONTENT */}
-        {isImageMode ? (
-          <FlatList
-            data={imageItems}
-            keyExtractor={(it) => it.id}
-            numColumns={2}
-            columnWrapperStyle={{ gap: 12 }}
-            contentContainerStyle={{
-              gap: 12,
-              paddingBottom: tabBarHeight + 110,
-            }}
-            renderItem={({ item }: any) => {
-              if (item.id === "__spacer__") return <View style={{ flex: 1 }} />;
+        <View style={{ height: theme.spacing.lg }} />
 
-              const idx: number = item.idx;
-              const uri: string = item.uri;
+        {/* OPTIONS */}
+        <ScrollView
+          contentContainerStyle={{ paddingBottom: TABBAR_ESTIMATE + 140 }}
+          showsVerticalScrollIndicator={false}
+        >
+          {isImageMode ? (
+            <View style={styles.grid}>
+              {optionImages.map((uri, idx) => {
+                const colCount = 2;
+                const isLastSingle =
+                  optionImages.length % colCount === 1 && idx === optionImages.length - 1;
 
-              const selected = selectedIndex === idx;
+                return (
+                  <Pressable
+                    key={String(idx)}
+                    style={[
+                      optionStyle(idx),
+                      styles.optImageWrap,
+                      isLastSingle && styles.optLastSingleCentered,
+                    ]}
+                    onPress={() => answer(idx)}
+                    disabled={busy || locked}
+                  >
+                    <Image
+                      source={{ uri }}
+                      style={styles.optImage}
+                      resizeMode="cover"
+                      onLoadStart={() =>
+                        setImgState((prev) => ({
+                          ...prev,
+                          [idx]: { loading: true, error: prev[idx]?.error ?? false },
+                        }))
+                      }
+                      onLoadEnd={() =>
+                        setImgState((prev) => ({
+                          ...prev,
+                          [idx]: { loading: false, error: prev[idx]?.error ?? false },
+                        }))
+                      }
+                      onError={() =>
+                        setImgState((prev) => ({
+                          ...prev,
+                          [idx]: { loading: false, error: true },
+                        }))
+                      }
+                    />
 
-              const showCorrect = locked && typeof correctIdx === "number" && idx === correctIdx;
-              const showWrong =
-                locked &&
-                typeof correctIdx === "number" &&
-                selectedIndex === idx &&
-                idx !== correctIdx;
+                    {imgState[idx]?.loading ? (
+                      <View style={styles.imgOverlay}>
+                        <ActivityIndicator />
+                        <Text style={styles.imgOverlayText}>Loading…</Text>
+                      </View>
+                    ) : null}
 
-              const showOnlySelectedBadge =
-                locked && typeof correctIdx !== "number" && selected && feedback?.isCorrect !== undefined;
+                    {imgState[idx]?.error ? (
+                      <View style={styles.imgOverlay}>
+                        <Text style={styles.imgOverlayText}>Failed to load</Text>
+                      </View>
+                    ) : null}
 
-              return (
+                    <View style={styles.badgeWrap}>{renderBadge(idx)}</View>
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : (
+            <View style={{ gap: 10 }}>
+              {optionRaw.map((val: any, idx: number) => (
                 <Pressable
-                  style={[
-                    styles.imgOpt,
-                    selected && styles.optSelected,
-                    showCorrect && styles.optCorrect,
-                    showWrong && styles.optWrong,
-                    busy && { opacity: 0.7 },
-                  ]}
+                  key={String(idx)}
+                  style={[optionStyle(idx), styles.optTextWrap]}
                   onPress={() => answer(idx)}
                   disabled={busy || locked}
                 >
-                  <Image
-                    source={{ uri }}
-                    style={styles.img}
-                    resizeMode="cover"
-                    onLoadStart={() =>
-                      setImgState((prev) => ({
-                        ...prev,
-                        [idx]: { loading: true, error: prev[idx]?.error ?? false },
-                      }))
-                    }
-                    onLoadEnd={() =>
-                      setImgState((prev) => ({
-                        ...prev,
-                        [idx]: { loading: false, error: prev[idx]?.error ?? false },
-                      }))
-                    }
-                    onError={() => setImgState((prev) => ({ ...prev, [idx]: { loading: false, error: true } }))}
-                  />
-
-                  {imgState[idx]?.loading ? (
-                    <View style={styles.imgOverlay}>
-                      <ActivityIndicator />
-                      <Text style={styles.imgOverlayText}>Loading…</Text>
-                    </View>
-                  ) : null}
-
-                  {imgState[idx]?.error ? (
-                    <View style={styles.imgOverlay}>
-                      <Text style={styles.imgOverlayText}>Failed to load</Text>
-                    </View>
-                  ) : null}
-
-                  {locked && (showCorrect || showWrong || showOnlySelectedBadge) ? (
-                    <View style={styles.badge}>
-                      <Text style={styles.badgeText}>
-                        {showCorrect
-                          ? "Correct"
-                          : showWrong
-                            ? "Wrong"
-                            : feedback?.isCorrect
-                              ? "Correct"
-                              : "Wrong"}
-                      </Text>
-                    </View>
-                  ) : null}
+                  <Text style={styles.optTxt}>{String(val)}</Text>
+                  <View style={styles.badgeWrapInline}>{renderBadge(idx)}</View>
                 </Pressable>
-              );
-            }}
-          />
-        ) : (
-          <FlatList
-            data={textItems}
-            keyExtractor={(it) => it.id}
-            contentContainerStyle={{ gap: 10, paddingBottom: tabBarHeight + 110 }}
-            renderItem={({ item }: any) => {
-              const idx: number = item.idx;
-              const selected = selectedIndex === idx;
+              ))}
+            </View>
+          )}
 
-              const showCorrect = locked && typeof correctIdx === "number" && idx === correctIdx;
-              const showWrong =
-                locked && typeof correctIdx === "number" && selectedIndex === idx && idx !== correctIdx;
+          <View style={{ height: theme.spacing.md }} />
 
-              return (
-                <Pressable
-                  style={[
-                    styles.opt,
-                    selected && styles.optSelected,
-                    showCorrect && styles.optCorrect,
-                    showWrong && styles.optWrong,
-                    busy && { opacity: 0.7 },
-                  ]}
-                  onPress={() => answer(idx)}
-                  disabled={busy || locked}
-                >
-                  <Text style={styles.optTxt}>{item.label}</Text>
-                </Pressable>
-              );
-            }}
-          />
-        )}
+          {/* links */}
+          <Pressable style={styles.link} onPress={() => navigation.navigate("MissionHistory")}>
+            <Text style={styles.linkTxt}>View completion history</Text>
+          </Pressable>
 
-        {/* links */}
-        <Pressable style={styles.link} onPress={() => navigation.navigate("MissionHistory")}>
-          <Text style={styles.linkTxt}>View completion history</Text>
-        </Pressable>
-
-        <Pressable style={styles.link} onPress={() => navigation.navigate("MissionHome")}>
-          <Text style={styles.linkTxt}>Back to Mission Home</Text>
-        </Pressable>
+          <Pressable style={styles.link} onPress={() => navigation.navigate("MissionHome")}>
+            <Text style={styles.linkTxt}>Back to Mission Home</Text>
+          </Pressable>
+        </ScrollView>
       </View>
 
+      {/* Toast like web */}
+      {toast ? (
+        <Animated.View
+          style={[
+            styles.toast,
+            toast.type === "success" ? styles.toastSuccess : styles.toastError,
+            {
+              transform: [
+                {
+                  translateY: toastAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [18, 0],
+                  }),
+                },
+              ],
+              opacity: toastAnim,
+              bottom: TABBAR_ESTIMATE + 86,
+            },
+          ]}
+          pointerEvents="none"
+        >
+          <Text style={styles.toastIcon}>{toast.type === "success" ? "✓" : "✕"}</Text>
+          <Text style={styles.toastText}>{toast.text}</Text>
+        </Animated.View>
+      ) : null}
+
       {/* Bottom Fixed CTA */}
-      <View style={[styles.bottomCta, { bottom: tabBarHeight + 12 }]}>
+      <View style={[styles.bottomCta, { bottom: TABBAR_ESTIMATE + 14 }]}>
         <Pressable
           style={[
             styles.nextBtn,
@@ -433,6 +490,18 @@ export default function MissionNextScreen({ navigation, route }: Props) {
         </Pressable>
       </View>
     </SafeAreaView>
+  );
+}
+
+/** Small pill for Correct/Wrong */
+function Pill({ type, text }: { type: ToastType; text: string }) {
+  const bg = type === "success" ? "#D1FAE5" : "#FEE2E2";
+  const fg = type === "success" ? "#065F46" : "#991B1B";
+  const bd = type === "success" ? "#34D399" : "#F87171";
+  return (
+    <View style={[styles.pill, { backgroundColor: bg, borderColor: bd }]}>
+      <Text style={[styles.pillText, { color: fg }]}>{text}</Text>
+    </View>
   );
 }
 
@@ -469,52 +538,86 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.accent,
   },
 
-  qText: { fontSize: 16, fontWeight: "900", marginTop: 8, color: theme.colors.text },
-  hintText: { marginTop: 6, fontSize: 12, color: theme.colors.muted, fontWeight: "700", opacity: 0.9 },
-
-  opt: {
-    padding: theme.spacing.md,
-    borderRadius: theme.radius.md,
+  questionCard: {
+    padding: theme.spacing.lg,
+    borderRadius: theme.radius.lg,
     borderWidth: 1,
     borderColor: theme.colors.border,
     backgroundColor: theme.colors.card,
   },
-  optTxt: { fontWeight: "800", color: theme.colors.text },
+  qText: { fontSize: 16, fontWeight: "900", color: theme.colors.text, textAlign: "center" },
+  hintText: {
+    marginTop: 8,
+    fontSize: 12,
+    color: theme.colors.muted,
+    fontWeight: "700",
+    opacity: 0.9,
+    textAlign: "center",
+  },
 
-  imgOpt: {
-    flex: 1,
-    aspectRatio: 1,
+  // grid options
+  grid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+
+  optCard: {
     borderRadius: theme.radius.lg,
     borderWidth: 1,
     borderColor: theme.colors.border,
+    backgroundColor: theme.colors.card,
     overflow: "hidden",
-    backgroundColor: "#f3f4f6",
   },
-  img: { width: "100%", height: "100%" },
+  optSelected: { borderColor: theme.colors.accent, borderWidth: 2 },
+
+  optCorrect: { borderColor: "#16A34A", borderWidth: 2 },
+  optWrong: { borderColor: "#DC2626", borderWidth: 2 },
+
+  optImageWrap: {
+    width: "48%",
+    aspectRatio: 1,
+    position: "relative",
+  },
+  optLastSingleCentered: {
+    width: "48%",
+    alignSelf: "center",
+  },
+
+  optImage: { width: "100%", height: "100%" },
 
   imgOverlay: {
     position: "absolute",
     inset: 0,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.45)",
+    backgroundColor: "rgba(255,255,255,0.55)",
   },
   imgOverlayText: { marginTop: 8, fontWeight: "900", color: theme.colors.text },
 
-  optSelected: { borderColor: theme.colors.accent, borderWidth: 2 },
-  optCorrect: { borderColor: "#16A34A", borderWidth: 2 },
-  optWrong: { borderColor: "#DC2626", borderWidth: 2 },
-
-  badge: {
+  badgeWrap: {
     position: "absolute",
     left: 10,
     bottom: 10,
+  },
+
+  optTextWrap: {
+    padding: theme.spacing.md,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  optTxt: { fontWeight: "900", color: theme.colors.text, flex: 1, paddingRight: 10 },
+  badgeWrapInline: { marginLeft: 8 },
+
+  pill: {
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 999,
-    backgroundColor: "rgba(0,0,0,0.55)",
+    borderWidth: 1,
   },
-  badgeText: { color: "white", fontWeight: "900", fontSize: 12 },
+  pillText: { fontWeight: "900", fontSize: 12 },
 
   link: { paddingVertical: 8 },
   linkTxt: { fontWeight: "900", color: theme.colors.accent },
@@ -527,4 +630,21 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   nextText: { color: "white", fontWeight: "900" },
+
+  toast: {
+    position: "absolute",
+    left: theme.spacing.lg,
+    right: theme.spacing.lg,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: theme.radius.lg,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderWidth: 1,
+  },
+  toastSuccess: { backgroundColor: "#ECFDF5", borderColor: "#34D399" },
+  toastError: { backgroundColor: "#FEF2F2", borderColor: "#F87171" },
+  toastIcon: { fontWeight: "900", fontSize: 16, color: theme.colors.text },
+  toastText: { fontWeight: "900", color: theme.colors.text },
 });
