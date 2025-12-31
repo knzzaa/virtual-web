@@ -17,7 +17,7 @@ const Stack = createNativeStackNavigator<MissionStackParamList>();
 
 export default function MissionStack() {
   return (
-    <Stack.Navigator initialRouteName="MissionHome">
+    <Stack.Navigator>
       <Stack.Screen name="MissionHome" component={MissionHomeScreen} options={{ title: "Mission" }} />
       <Stack.Screen name="MissionNext" component={MissionNextScreen} options={{ title: "Mission" }} />
       <Stack.Screen name="MissionResult" component={MissionResultScreen} options={{ title: "Result" }} />
