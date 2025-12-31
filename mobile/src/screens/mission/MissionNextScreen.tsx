@@ -1,602 +1,483 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+// src/screens/mission/MissionNextScreen.tsx
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
+  ScrollView,
   StyleSheet,
   Pressable,
-  Alert,
   Image,
+  Dimensions,
   ActivityIndicator,
-  FlatList,
-  SafeAreaView,
+  Alert,
 } from "react-native";
-import type { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
+import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 
-import { missionService } from "../../services/mission.service";
-import type { MissionNextResponse } from "../../types/dtos";
-import type { MissionStackParamList } from "../../navigation/MissionStack";
 import theme from "../../styles/theme";
 import AnimatedAppBackground from "../../components/AnimatedAppBackground";
+import Button from "../../components/Button";
+import { missionService } from "../../services/mission.service";
+import type { MissionAnswerResponse, MissionNextResponse } from "../../types/dtos";
+import type { MissionStackParamList } from "../../navigation/MissionStack";
 
 type Props = NativeStackScreenProps<MissionStackParamList, "MissionNext">;
 
-type ImgState = Record<number, { loading: boolean; error: boolean }>;
+/**
+ * Map filename/relative path -> local assets (RN butuh require statik).
+ * Path relatif dari: mobile/src/screens/mission/MissionNextScreen.tsx
+ * ke: mobile/assets/img/*
+ */
+const LOCAL_IMG: Record<string, any> = {
+  "about-us.png": require("../../../assets/img/about-us.png"),
+  "bear.png": require("../../../assets/img/bear.png"),
+  "books.png": require("../../../assets/img/books.png"),
+  "clock.png": require("../../../assets/img/clock.png"),
+  "exam.png": require("../../../assets/img/exam.png"),
+  "login.png": require("../../../assets/img/login.png"),
+  "material.png": require("../../../assets/img/material.png"),
+  "mission-completed.png": require("../../../assets/img/mission-completed.png"),
+  "mission.png": require("../../../assets/img/mission.png"),
+  "profile.png": require("../../../assets/img/profile.png"),
+  "register.png": require("../../../assets/img/register.png"),
+  "Snowflake.png": require("../../../assets/img/Snowflake.png"),
+};
 
-const CTA_HEIGHT = 52;
-const SNACK_HEIGHT = 44;
-const GAP = 12;
+function extractFileName(x: string) {
+  const cleaned = x.split("?")[0].split("#")[0];
+  const parts = cleaned.split("/");
+  return parts[parts.length - 1];
+}
+
+function looksLikeImagePath(s: string) {
+  const file = extractFileName(s).toLowerCase();
+  return (
+    file.endsWith(".png") ||
+    file.endsWith(".jpg") ||
+    file.endsWith(".jpeg") ||
+    file.endsWith(".webp")
+  );
+}
+
+function toImageSourceFromOption(opt: string) {
+  const s = (opt ?? "").trim();
+  if (!s) return undefined;
+
+  // remote url
+  if (s.startsWith("http://") || s.startsWith("https://")) return { uri: s };
+
+  // filename / relative path -> map ke local assets kalau ada
+  const file = extractFileName(s);
+  if (LOCAL_IMG[file]) return LOCAL_IMG[file];
+
+  // kalau bentuknya kayak image tapi ga ada di local mapping,
+  // coba treat as uri (kadang backend ngasih path absolut tanpa host)
+  if (looksLikeImagePath(s)) return { uri: s };
+
+  return undefined;
+}
 
 export default function MissionNextScreen({ navigation, route }: Props) {
-  // ✅ Proper hook usage (no warning)
+  const insets = useSafeAreaInsets();
   const tabBarHeight = useBottomTabBarHeight();
 
-  const listRef = useRef<FlatList<any>>(null);
+  const [data, setData] = useState<MissionNextResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
 
-  const [data, setData] = useState<MissionNextResponse | null>(() => {
-    // kalau route param optional, aman:
-    // @ts-ignore
-    return route.params?.initialData ?? null;
-  });
-
-  const [busy, setBusy] = useState(false);
-
-  // UI state
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
-  const [locked, setLocked] = useState(false);
-  const [pendingNextQuestion, setPendingNextQuestion] = useState<any | null>(null);
-  const [pendingScore, setPendingScore] = useState<number | null>(null);
 
-  const [feedback, setFeedback] = useState<{
-    correctOptionIndex?: number;
-    isCorrect?: boolean;
-  } | null>(null);
+  // ✅ footer height dinamis biar padding scroll pas (nggak ketutup & tetep bisa scroll)
+  const [footerH, setFooterH] = useState(0);
 
-  const [imgState, setImgState] = useState<ImgState>({});
+  const footerBottom = tabBarHeight + insets.bottom + theme.spacing.sm;
+  const scrollBottomPadding = footerBottom + footerH + theme.spacing.md;
 
-  const q = useMemo(() => (data as any)?.currentQuestion ?? null, [data]);
+  const loadNext = useCallback(
+    async (preferInitial?: boolean) => {
+      setLoading(true);
+      try {
+        if (preferInitial && route.params?.initialData) {
+          setData(route.params.initialData);
+          return;
+        }
+        const res = await missionService.next();
+        setData(res);
+      } catch (e: any) {
+        Alert.alert("Failed to load mission", e?.message ?? "Error");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [route.params]
+  );
+
+  useEffect(() => {
+    // pakai initialData dari MissionHome biar lebih snappy
+    loadNext(true);
+  }, [loadNext]);
+
   const mission = (data as any)?.mission ?? null;
-  const progress = (data as any)?.progress ?? null;
 
-  const optionImages = useMemo(() => {
-    const opts: unknown = q?.options;
-    if (!Array.isArray(opts)) return [] as string[];
-    return opts.filter((o): o is string => typeof o === "string");
-  }, [q]);
-
-  const isImageMode = useMemo(() => {
-    return optionImages.length > 0 && optionImages.every((o) => /^https?:\/\//.test(o));
-  }, [optionImages]);
-
-  // Reset per question
+  // Kalau mission null artinya "All missions completed!"
   useEffect(() => {
-    const qn = (q as any)?.questionNumber;
-    if (!qn) return;
-    setSelectedIndex(null);
-    setLocked(false);
-    setPendingNextQuestion(null);
-    setPendingScore(null);
-    setFeedback(null);
-    setImgState({});
-  }, [q]);
+    if (!loading && data && mission === null) {
+      // Di desain kamu, lebih masuk akal balik ke Home
+      // (karena MissionResult butuh percentage/finalScore)
+      // tapi kalau mau, bisa bikin "All Completed Screen" sendiri.
+      // Untuk sekarang: tampilkan alert sekali lalu balik.
+      Alert.alert("Mission", (data as any)?.message ?? "All missions completed!");
+      navigation.navigate("MissionHome");
+    }
+  }, [loading, data, mission, navigation]);
 
-  async function load() {
-    const res = await missionService.next();
-    setData(res);
-  }
+  const title = useMemo(() => {
+    if (!mission || mission === null) return "Mission";
+    return mission.title ?? "Mission";
+  }, [mission]);
 
-  // fetch kalau tidak ada initialData
-  useEffect(() => {
-    // @ts-ignore
-    if (!route.params?.initialData) load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const desc = useMemo(() => {
+    if (!mission || mission === null) return "";
+    return mission.description ?? "";
+  }, [mission]);
 
-  function buildGridData<T extends { id: string }>(items: T[]) {
-    if (items.length % 2 === 1) return [...items, { id: "__spacer__" } as T];
-    return items;
-  }
+  const totalQuestions = useMemo(() => {
+    if (!mission || mission === null) return 0;
+    return Number(mission.totalQuestions ?? 0);
+  }, [mission]);
 
-  async function answer(selectedOptionIndex: number) {
-    if (!data || (data as any).mission === null) return;
-    if (busy || locked) return;
+  const currentQuestion = useMemo(() => {
+    if (!data || (data as any)?.mission === null) return null;
+    return (data as any)?.currentQuestion ?? null;
+  }, [data]);
 
-    const missionLocal = (data as any).mission;
-    const cq = (data as any).currentQuestion;
+  const progress = useMemo(() => {
+    if (!data || (data as any)?.mission === null) return null;
+    return (data as any)?.progress ?? null;
+  }, [data]);
 
-    setSelectedIndex(selectedOptionIndex);
-    setLocked(true);
-    setBusy(true);
+  const qNumber = Number(currentQuestion?.questionNumber ?? 0); // 1-based
+  const qIndex0 = Math.max(0, qNumber - 1);
+  const score = Number(progress?.currentScore ?? 0);
+  const prompt = String(currentQuestion?.questionText ?? "Which one is correct?");
+  const options: string[] = Array.isArray(currentQuestion?.options) ? currentQuestion.options : [];
+
+  const progressPct = useMemo(() => {
+    if (!totalQuestions) return 0;
+    const cur = Math.min(qIndex0 + 1, totalQuestions);
+    return Math.round((cur / totalQuestions) * 100);
+  }, [qIndex0, totalQuestions]);
+
+  // ====== sizing opsi 3 sebaris kayak web ======
+  const { width } = Dimensions.get("window");
+  const GAP = theme.spacing.sm;
+  const H_PADDING = theme.spacing.lg;
+  const OPTION_W = (width - H_PADDING * 2 - GAP * 2) / 3;
+
+  const canNext = selectedIndex !== null && !submitting;
+
+  const submitAnswer = async (idx: number) => {
+    if (!mission || mission === null) return;
+    if (!currentQuestion) return;
+    if (submitting) return;
+
+    setSelectedIndex(idx);
+    setSubmitting(true);
 
     try {
-      const res: any = await missionService.answer(missionLocal.slug, {
-        questionNumber: cq.questionNumber,
-        selectedOptionIndex,
+      const slug = String(mission.slug);
+
+      const res: MissionAnswerResponse = await missionService.answer(slug, {
+        questionNumber: Number(currentQuestion.questionNumber),
+        selectedOptionIndex: idx,
       });
 
-      const correctOptionIndex =
-        typeof res?.correctOptionIndex === "number" ? res.correctOptionIndex : undefined;
-
-      const isCorrect =
-        typeof res?.isCorrect === "boolean"
-          ? res.isCorrect
-          : correctOptionIndex !== undefined
-            ? selectedOptionIndex === correctOptionIndex
-            : undefined;
-
-      setFeedback({ correctOptionIndex, isCorrect });
-
-      // biar UX enak: setelah jawab, auto-scroll dikit ke bawah (kalau perlu)
-      setTimeout(() => {
-        listRef.current?.scrollToOffset({ offset: 0, animated: true });
-      }, 10);
-
+      // kalau completed -> ke Result (sesuai MissionStackParamList)
       if (res.completed) {
         navigation.navigate("MissionResult", {
-          percentage: res.percentage ?? 0,
-          finalScore: res.finalScore ?? 0,
-          totalQuestions: res.totalQuestions ?? 0,
+          percentage: Number(res.percentage ?? (res.totalQuestions ? Math.round(((res.finalScore ?? 0) / res.totalQuestions) * 100) : 0)),
+          finalScore: Number(res.finalScore ?? res.currentScore ?? 0),
+          totalQuestions: Number(res.totalQuestions ?? totalQuestions ?? 0),
         });
-
-        const next = await missionService.next();
-        setData(next);
         return;
       }
 
-      if (res.nextQuestion) {
-        setPendingNextQuestion(res.nextQuestion);
-        setPendingScore(res.currentScore);
-      }
-    } catch (e: any) {
-      Alert.alert("Submit failed", e?.message ?? "Error");
+      // lanjut next question
+      await loadNext(false);
       setSelectedIndex(null);
-      setLocked(false);
-      setFeedback(null);
-      setPendingNextQuestion(null);
-      setPendingScore(null);
+    } catch (e: any) {
+      Alert.alert("Failed to submit answer", e?.message ?? "Error");
     } finally {
-      setBusy(false);
+      setSubmitting(false);
     }
-  }
+  };
 
-  function goNext() {
-    if (!data || !pendingNextQuestion || !mission) return;
-
-    const prevProgress = (data as any).progress ?? {};
-    const nextQ = pendingNextQuestion;
-
-    setData({
-      mission,
-      currentQuestion: nextQ,
-      progress: {
-        currentQuestionNumber: nextQ.questionNumber,
-        questionsAnswered: (prevProgress.questionsAnswered ?? 0) + 1,
-        currentScore: pendingScore ?? prevProgress.currentScore ?? 0,
-      },
-    } as any);
-  }
-
-  // Loading shell
-  if (!data) {
-    return (
-      <View style={{ flex: 1 }}>
-        <AnimatedAppBackground />
-        <View style={{ padding: 16 }}>
-          <Text style={{ color: theme.colors.text, fontWeight: "800" }}>Loading...</Text>
-        </View>
-      </View>
-    );
-  }
-
-  // all completed
-  if ((data as any).mission === null) {
-    return (
-      <SafeAreaView style={styles.screen}>
-        <AnimatedAppBackground />
-        <View style={styles.wrap}>
-          <View style={styles.headerCard}>
-            <View style={styles.headerRow}>
-              <Image
-                source={require("../../../assets/img/mission-completed.png")}
-                style={styles.headerIcon}
-              />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.title}>Missions</Text>
-                <Text style={styles.desc}>{(data as any).message ?? "All missions completed!"}</Text>
-              </View>
-            </View>
-
-            <View style={{ height: theme.spacing.md }} />
-
-            <Pressable style={styles.link} onPress={() => navigation.navigate("MissionHistory")}>
-              <Text style={styles.linkTxt}>View completion history</Text>
-            </Pressable>
-
-            <Pressable style={styles.link} onPress={() => navigation.navigate("MissionHome" as any)}>
-              <Text style={styles.linkTxt}>Back to Mission Home</Text>
-            </Pressable>
-          </View>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  if (!q) {
-    return (
-      <View style={{ flex: 1 }}>
-        <AnimatedAppBackground />
-        <View style={{ padding: 16 }}>
-          <Text style={{ color: theme.colors.text, fontWeight: "800" }}>Loading...</Text>
-        </View>
-      </View>
-    );
-  }
-
-  const totalQ = mission?.totalQuestions ?? 0;
-  const pct = totalQ ? Math.min(1, q.questionNumber / totalQ) : 0;
-  const pctLabel = `${Math.round(pct * 100)}%`;
-
-  const correctIdx = feedback?.correctOptionIndex;
-
-  const imageItems = useMemo(() => {
-    return buildGridData(optionImages.map((uri, idx) => ({ id: String(idx), uri, idx })));
-  }, [optionImages]);
-
-  const textItems = useMemo(() => {
-    const opts: unknown = q?.options;
-    const arr = Array.isArray(opts) ? opts : [];
-    return arr.map((val: any, idx: number) => ({ id: String(idx), label: String(val), idx }));
-  }, [q]);
-
-  const canNext = locked && !!pendingNextQuestion && !busy;
-
-  // ✅ FIX: biar list nggak ketutup snackbar + tombol
-  const listBottomPad = tabBarHeight + CTA_HEIGHT + SNACK_HEIGHT + 28;
-
-  const snackbarVisible = locked && (feedback?.isCorrect !== undefined || typeof correctIdx === "number");
-  const snackbarCorrect =
-    feedback?.isCorrect === true ||
-    (typeof correctIdx === "number" && selectedIndex === correctIdx);
+  const onNext = () => {
+    // Submit dilakukan saat tap opsi (kayak web kamu: klik gambar langsung jawab).
+    // Next cuma UX.
+    if (!canNext) return;
+  };
 
   return (
-    <SafeAreaView style={styles.screen}>
+    <View style={styles.screen}>
       <AnimatedAppBackground />
 
-      <View style={styles.wrap}>
-        {/* HEADER */}
-        <View style={styles.headerCard}>
-          <View style={styles.headerRow}>
-            <Image source={require("../../../assets/img/mission.png")} style={styles.headerIcon} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.title}>{mission.title}</Text>
-              {!!mission.description && <Text style={styles.desc}>{mission.description}</Text>}
+      <ScrollView
+        style={styles.wrap}
+        contentContainerStyle={[styles.content, { paddingBottom: scrollBottomPadding }]}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Header Card */}
+        <View style={styles.card}>
+          <View style={styles.headerTop}>
+            <View style={styles.iconCircle}>
+              <Text style={styles.iconEmoji}>✨</Text>
             </View>
           </View>
 
-          <View style={{ height: theme.spacing.md }} />
+          <Text style={styles.title}>{title}</Text>
+          {!!desc && <Text style={styles.subtitle}>{desc}</Text>}
 
-          <View style={styles.metaRow}>
-            <Text style={styles.meta}>
-              Q{q.questionNumber}/{mission.totalQuestions} • Score: {progress?.currentScore ?? 0}
+          <View style={styles.progressRow}>
+            <Text style={styles.metaText}>
+              Q{Math.min(qIndex0 + 1, totalQuestions || qIndex0 + 1)}/{totalQuestions || "?"} • Score {score}
             </Text>
-            <Text style={styles.meta}>{pctLabel}</Text>
+            <Text style={styles.metaText}>{progressPct}%</Text>
           </View>
 
-          <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, { width: `${Math.round(pct * 100)}%` }]} />
+          <View style={styles.progressBg}>
+            <View style={[styles.progressFill, { width: `${progressPct}%` }]} />
           </View>
         </View>
 
-        <View style={{ height: theme.spacing.lg }} />
-
-        {/* QUESTION CARD (lebih mirip web) */}
-        <View style={styles.questionCard}>
-          <Text style={styles.qText}>{q.questionText}</Text>
-          <Text style={styles.hintText}>
-            Tap one option to answer{canNext ? ", then press Next" : ""}.
-          </Text>
+        {/* Question */}
+        <View style={[styles.card, { marginTop: theme.spacing.sm }]}>
+          <Text style={styles.qTitle}>{prompt}</Text>
+          <Text style={styles.qHint}>Tap one option to answer.</Text>
         </View>
 
-        <View style={{ height: 12 }} />
-
-        {/* CONTENT */}
-        {isImageMode ? (
-          <FlatList
-            ref={listRef}
-            data={imageItems}
-            keyExtractor={(it) => it.id}
-            numColumns={2}
-            columnWrapperStyle={{ gap: GAP }}
-            contentContainerStyle={{
-              gap: GAP,
-              paddingBottom: listBottomPad,
-            }}
-            renderItem={({ item }: any) => {
-              if (item.id === "__spacer__") return <View style={{ flex: 1 }} />;
-
-              const idx: number = item.idx;
-              const uri: string = item.uri;
-
+        {/* Options */}
+        <View style={[styles.optionsRow, { marginTop: theme.spacing.sm, gap: GAP }]}>
+          {loading ? (
+            <View style={styles.loadingBox}>
+              <ActivityIndicator />
+              <Text style={styles.loadingText}>Loading question...</Text>
+            </View>
+          ) : (
+            options.slice(0, 3).map((opt, idx) => {
+              const img = toImageSourceFromOption(opt);
               const selected = selectedIndex === idx;
 
-              const showCorrect = locked && typeof correctIdx === "number" && idx === correctIdx;
-              const showWrong =
-                locked &&
-                typeof correctIdx === "number" &&
-                selectedIndex === idx &&
-                idx !== correctIdx;
-
-              // fallback kalau backend ga ngirim correctOptionIndex
-              const showOnlySelectedBadge =
-                locked &&
-                typeof correctIdx !== "number" &&
-                selected &&
-                feedback?.isCorrect !== undefined;
+              // ✅ key unik (fix duplicate key warning)
+              const key = `q${qNumber}-idx${idx}-${opt}`;
 
               return (
                 <Pressable
-                  style={[
-                    styles.imgOpt,
-                    selected && styles.optSelected,
-                    showCorrect && styles.optCorrect,
-                    showWrong && styles.optWrong,
-                    busy && { opacity: 0.7 },
+                  key={key}
+                  onPress={() => submitAnswer(idx)}
+                  disabled={submitting}
+                  style={({ pressed }) => [
+                    {
+                      width: OPTION_W,
+                      borderRadius: theme.radius.lg,
+                      overflow: "hidden",
+                      borderWidth: theme.card.borderWidth,
+                      borderColor: theme.card.borderColor,
+                      backgroundColor: theme.colors.card,
+                    },
+                    selected ? styles.optionSelected : null,
+                    pressed && !submitting ? { transform: [{ scale: 0.99 }] } : null,
+                    submitting ? { opacity: 0.82 } : null,
                   ]}
-                  onPress={() => answer(idx)}
-                  disabled={busy || locked}
                 >
-                  <Image
-                    source={{ uri }}
-                    style={styles.img}
-                    resizeMode="cover"
-                    onLoadStart={() =>
-                      setImgState((prev) => ({
-                        ...prev,
-                        [idx]: { loading: true, error: prev[idx]?.error ?? false },
-                      }))
-                    }
-                    onLoadEnd={() =>
-                      setImgState((prev) => ({
-                        ...prev,
-                        [idx]: { loading: false, error: prev[idx]?.error ?? false },
-                      }))
-                    }
-                    onError={() =>
-                      setImgState((prev) => ({ ...prev, [idx]: { loading: false, error: true } }))
-                    }
-                  />
-
-                  {imgState[idx]?.loading ? (
-                    <View style={styles.imgOverlay}>
-                      <ActivityIndicator />
-                      <Text style={styles.imgOverlayText}>Loading…</Text>
-                    </View>
-                  ) : null}
-
-                  {imgState[idx]?.error ? (
-                    <View style={styles.imgOverlay}>
-                      <Text style={styles.imgOverlayText}>Failed to load</Text>
-                    </View>
-                  ) : null}
-
-                  {/* Badge tetap ada (correct/wrong) */}
-                  {locked && (showCorrect || showWrong || showOnlySelectedBadge) ? (
-                    <View style={[styles.badge, showCorrect ? styles.badgeOk : styles.badgeBad]}>
-                      <Text style={styles.badgeText}>
-                        {showCorrect
-                          ? "Correct"
-                          : showWrong
-                            ? "Wrong"
-                            : feedback?.isCorrect
-                              ? "Correct"
-                              : "Wrong"}
+                  {img ? (
+                    <Image
+                      source={img}
+                      style={{
+                        width: "100%",
+                        height: OPTION_W,
+                        resizeMode: "cover",
+                      }}
+                    />
+                  ) : (
+                    <View
+                      style={{
+                        width: "100%",
+                        height: OPTION_W,
+                        alignItems: "center",
+                        justifyContent: "center",
+                        paddingHorizontal: 8,
+                      }}
+                    >
+                      {/* kalau option bukan image, tampilkan text */}
+                      <Text
+                        style={{ color: theme.colors.text, fontWeight: "900", textAlign: "center" }}
+                        numberOfLines={3}
+                      >
+                        {String(opt)}
                       </Text>
                     </View>
-                  ) : null}
+                  )}
                 </Pressable>
               );
-            }}
-          />
-        ) : (
-          <FlatList
-            ref={listRef}
-            data={textItems}
-            keyExtractor={(it) => it.id}
-            contentContainerStyle={{ gap: 10, paddingBottom: listBottomPad }}
-            renderItem={({ item }: any) => {
-              const idx: number = item.idx;
-              const selected = selectedIndex === idx;
-
-              const showCorrect = locked && typeof correctIdx === "number" && idx === correctIdx;
-              const showWrong =
-                locked && typeof correctIdx === "number" && selectedIndex === idx && idx !== correctIdx;
-
-              return (
-                <Pressable
-                  style={[
-                    styles.opt,
-                    selected && styles.optSelected,
-                    showCorrect && styles.optCorrect,
-                    showWrong && styles.optWrong,
-                    busy && { opacity: 0.7 },
-                  ]}
-                  onPress={() => answer(idx)}
-                  disabled={busy || locked}
-                >
-                  <Text style={styles.optTxt}>{item.label}</Text>
-                </Pressable>
-              );
-            }}
-          />
-        )}
-
-        {/* links */}
-        <Pressable style={styles.link} onPress={() => navigation.navigate("MissionHistory")}>
-          <Text style={styles.linkTxt}>View completion history</Text>
-        </Pressable>
-
-        <Pressable style={styles.link} onPress={() => navigation.navigate("MissionHome" as any)}>
-          <Text style={styles.linkTxt}>Back to Mission Home</Text>
-        </Pressable>
-      </View>
-
-      {/* ✅ Snackbar feedback (fixed, nggak ganggu konten) */}
-      {snackbarVisible ? (
-        <View
-          style={[
-            styles.snackbar,
-            { bottom: tabBarHeight + CTA_HEIGHT + 18 },
-            snackbarCorrect ? styles.snackbarOk : styles.snackbarBad,
-          ]}
-        >
-          <Text style={styles.snackbarText}>
-            {snackbarCorrect ? "✅ Excellent!" : "❌ Wrong :("}
-          </Text>
+            })
+          )}
         </View>
-      ) : null}
+      </ScrollView>
 
-      {/* ✅ Bottom Fixed CTA (posisi rapih, nggak nutup konten karena listBottomPad) */}
-      <View style={[styles.bottomCta, { bottom: tabBarHeight + 12 }]}>
-        <Pressable
-          style={[
-            styles.nextBtn,
-            (!locked || busy) && { opacity: 0.55 },
-            locked && !pendingNextQuestion && !busy && { opacity: 0.7 },
-          ]}
-          disabled={!locked || busy || !pendingNextQuestion}
-          onPress={goNext}
-        >
-          <Text style={styles.nextText}>
-            {busy ? "Submitting..." : pendingNextQuestion ? "Next" : "Select an answer"}
+      {/* Floating footer */}
+      <View
+        pointerEvents="box-none"
+        style={[
+          styles.footerWrap,
+          {
+            left: theme.spacing.lg,
+            right: theme.spacing.lg,
+            bottom: footerBottom,
+          },
+        ]}
+        onLayout={(e) => setFooterH(e.nativeEvent.layout.height)}
+      >
+        <View style={styles.footerCard}>
+          <Button title={submitting ? "Submitting..." : "Next"} onPress={onNext} disabled={!canNext} />
+
+          <Text style={styles.footerHint}>
+            {submitting
+              ? "Checking your answer..."
+              : selectedIndex !== null
+              ? "Answer submitted — loading next…"
+              : "Select an answer to continue"}
           </Text>
-        </Pressable>
+
+          <View style={styles.footerRow}>
+            <Pressable
+              onPress={() => navigation.navigate("MissionHistory")}
+              style={({ pressed }) => [styles.chip, pressed && { opacity: 0.85 }]}
+            >
+              <Text style={styles.chipText}>History</Text>
+            </Pressable>
+
+            <Pressable
+              onPress={() => navigation.navigate("MissionHome")}
+              style={({ pressed }) => [styles.chip, pressed && { opacity: 0.85 }]}
+            >
+              <Text style={styles.chipText}>Home</Text>
+            </Pressable>
+          </View>
+        </View>
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  wrap: { flex: 1, padding: theme.spacing.lg },
 
-  headerCard: {
-    padding: theme.spacing.lg,
+  wrap: { flex: 1, paddingHorizontal: theme.spacing.lg, paddingTop: theme.spacing.lg },
+  content: { paddingBottom: 24 },
+
+  card: {
+    padding: theme.card.padding,
     borderWidth: theme.card.borderWidth,
     borderColor: theme.card.borderColor,
-    borderRadius: theme.radius.lg,
+    borderRadius: theme.card.borderRadius,
     backgroundColor: theme.colors.card,
   },
-  headerRow: { flexDirection: "row", alignItems: "center" },
-  headerIcon: { width: 44, height: 44, marginRight: theme.spacing.md },
 
-  title: { fontSize: 22, fontWeight: "900", color: theme.colors.text },
-  desc: { opacity: 0.75, color: theme.colors.muted, marginTop: 6 },
+  headerTop: { alignItems: "center", marginBottom: theme.spacing.sm },
+  iconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(167,139,250,0.18)",
+    borderWidth: 1,
+    borderColor: "rgba(167,139,250,0.28)",
+  },
+  iconEmoji: { fontSize: 22 },
 
-  metaRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  meta: { opacity: 0.75, fontSize: 12, marginTop: 8, color: theme.colors.muted, fontWeight: "800" },
+  title: { fontWeight: "900", color: theme.colors.text, textAlign: "center", fontSize: 18 },
+  subtitle: {
+    marginTop: 4,
+    color: theme.colors.muted,
+    textAlign: "center",
+    fontSize: 12,
+    lineHeight: 16,
+  },
 
-  progressTrack: {
-    height: 10,
-    borderRadius: 999,
-    backgroundColor: "#f3f4f6",
-    overflow: "hidden",
+  progressRow: {
+    marginTop: theme.spacing.md,
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  metaText: { color: theme.colors.muted, fontSize: 12, opacity: 0.8, fontWeight: "700" },
+  progressBg: {
     marginTop: theme.spacing.sm,
+    height: 8,
+    borderRadius: 999,
+    backgroundColor: "rgba(17,24,39,0.06)",
+    overflow: "hidden",
   },
   progressFill: {
-    height: 10,
+    height: "100%",
     borderRadius: 999,
-    backgroundColor: theme.colors.accent,
+    backgroundColor: "rgba(124, 58, 237, 0.9)",
   },
 
-  // Question Card mirip web (rapih & kebaca)
-  questionCard: {
-    padding: theme.spacing.md,
-    borderRadius: theme.radius.lg,
-    backgroundColor: theme.colors.card,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
+  qTitle: { fontWeight: "900", color: theme.colors.text, fontSize: 14 },
+  qHint: { marginTop: 4, color: theme.colors.muted, fontSize: 12, opacity: 0.8 },
+
+  optionsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
   },
-  qText: { fontSize: 16, fontWeight: "900", color: theme.colors.text, textAlign: "center" },
-  hintText: {
-    marginTop: 6,
+  optionSelected: {
+    borderWidth: 2,
+    borderColor: "rgba(124, 58, 237, 0.55)",
+  },
+
+  loadingBox: {
+    flex: 1,
+    padding: theme.spacing.lg,
+    borderRadius: theme.radius.lg,
+    borderWidth: theme.card.borderWidth,
+    borderColor: theme.card.borderColor,
+    backgroundColor: theme.colors.card,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  loadingText: { marginTop: 8, color: theme.colors.muted, fontWeight: "700" },
+
+  footerWrap: { position: "absolute" },
+  footerCard: {
+    padding: theme.card.padding,
+    borderWidth: theme.card.borderWidth,
+    borderColor: theme.card.borderColor,
+    borderRadius: theme.card.borderRadius,
+    backgroundColor: theme.colors.card,
+  },
+  footerHint: {
+    marginTop: 8,
+    textAlign: "center",
     fontSize: 12,
     color: theme.colors.muted,
+    opacity: 0.8,
     fontWeight: "700",
-    opacity: 0.9,
-    textAlign: "center",
   },
-
-  opt: {
-    padding: theme.spacing.md,
-    borderRadius: theme.radius.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.card,
+  footerRow: {
+    marginTop: theme.spacing.sm,
+    flexDirection: "row",
+    gap: theme.spacing.sm,
   },
-  optTxt: { fontWeight: "800", color: theme.colors.text },
-
-  imgOpt: {
-    flex: 1,
-    aspectRatio: 1,
-    borderRadius: theme.radius.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    overflow: "hidden",
-    backgroundColor: "#f3f4f6",
-  },
-  img: { width: "100%", height: "100%" },
-
-  imgOverlay: {
-    position: "absolute",
-    inset: 0,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.45)",
-  },
-  imgOverlayText: { marginTop: 8, fontWeight: "900", color: theme.colors.text },
-
-  optSelected: { borderColor: theme.colors.accent, borderWidth: 2 },
-  optCorrect: { borderColor: "#16A34A", borderWidth: 2 },
-  optWrong: { borderColor: "#DC2626", borderWidth: 2 },
-
-  badge: {
-    position: "absolute",
-    left: 10,
-    bottom: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+  chip: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
     borderRadius: 999,
-  },
-  badgeOk: { backgroundColor: "rgba(22,163,74,0.85)" },
-  badgeBad: { backgroundColor: "rgba(220,38,38,0.85)" },
-  badgeText: { color: "white", fontWeight: "900", fontSize: 12 },
-
-  link: { paddingVertical: 8 },
-  linkTxt: { fontWeight: "900", color: theme.colors.accent },
-
-  // Snackbar fixed
-  snackbar: {
-    position: "absolute",
-    left: theme.spacing.lg,
-    right: theme.spacing.lg,
-    height: SNACK_HEIGHT,
-    borderRadius: theme.radius.lg,
-    alignItems: "center",
-    justifyContent: "center",
+    backgroundColor: "rgba(167,139,250,0.16)",
     borderWidth: 1,
+    borderColor: "rgba(167,139,250,0.28)",
   },
-  snackbarOk: { backgroundColor: "rgba(34,197,94,0.18)", borderColor: "rgba(34,197,94,0.45)" },
-  snackbarBad: { backgroundColor: "rgba(239,68,68,0.14)", borderColor: "rgba(239,68,68,0.38)" },
-  snackbarText: { fontWeight: "900", color: theme.colors.text },
-
-  // Bottom CTA
-  bottomCta: { position: "absolute", left: theme.spacing.lg, right: theme.spacing.lg },
-  nextBtn: {
-    height: CTA_HEIGHT,
-    borderRadius: theme.radius.lg,
-    backgroundColor: theme.colors.accent,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  nextText: { color: "white", fontWeight: "900" },
+  chipText: { fontWeight: "900", color: theme.colors.text },
 });
