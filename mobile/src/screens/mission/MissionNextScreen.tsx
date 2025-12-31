@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -23,17 +23,34 @@ type Props = NativeStackScreenProps<MissionStackParamList, "MissionNext">;
 
 type ImgState = Record<number, { loading: boolean; error: boolean }>;
 
+const CTA_HEIGHT = 52;
+const SNACK_HEIGHT = 44;
+const GAP = 12;
+
 export default function MissionNextScreen({ navigation, route }: Props) {
+  // ✅ Proper hook usage (no warning)
   const tabBarHeight = useBottomTabBarHeight();
 
-  const [data, setData] = useState<MissionNextResponse | null>(() => route.params?.initialData ?? null);
+  const listRef = useRef<FlatList<any>>(null);
+
+  const [data, setData] = useState<MissionNextResponse | null>(() => {
+    // kalau route param optional, aman:
+    // @ts-ignore
+    return route.params?.initialData ?? null;
+  });
+
   const [busy, setBusy] = useState(false);
 
+  // UI state
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [locked, setLocked] = useState(false);
   const [pendingNextQuestion, setPendingNextQuestion] = useState<any | null>(null);
   const [pendingScore, setPendingScore] = useState<number | null>(null);
-  const [feedback, setFeedback] = useState<{ correctOptionIndex?: number; isCorrect?: boolean } | null>(null);
+
+  const [feedback, setFeedback] = useState<{
+    correctOptionIndex?: number;
+    isCorrect?: boolean;
+  } | null>(null);
 
   const [imgState, setImgState] = useState<ImgState>({});
 
@@ -51,16 +68,7 @@ export default function MissionNextScreen({ navigation, route }: Props) {
     return optionImages.length > 0 && optionImages.every((o) => /^https?:\/\//.test(o));
   }, [optionImages]);
 
-  const correctIdx = feedback?.correctOptionIndex;
-
-  const evaluatedIsCorrect = useMemo(() => {
-    if (!locked) return undefined;
-    if (typeof feedback?.isCorrect === "boolean") return feedback.isCorrect;
-    if (typeof correctIdx === "number" && typeof selectedIndex === "number") return selectedIndex === correctIdx;
-    return undefined;
-  }, [locked, feedback?.isCorrect, correctIdx, selectedIndex]);
-
-  // reset UI when question changes
+  // Reset per question
   useEffect(() => {
     const qn = (q as any)?.questionNumber;
     if (!qn) return;
@@ -77,7 +85,9 @@ export default function MissionNextScreen({ navigation, route }: Props) {
     setData(res);
   }
 
+  // fetch kalau tidak ada initialData
   useEffect(() => {
+    // @ts-ignore
     if (!route.params?.initialData) load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -104,17 +114,22 @@ export default function MissionNextScreen({ navigation, route }: Props) {
         selectedOptionIndex,
       });
 
-      const nextCorrectIndex =
+      const correctOptionIndex =
         typeof res?.correctOptionIndex === "number" ? res.correctOptionIndex : undefined;
 
-      const nextIsCorrect =
+      const isCorrect =
         typeof res?.isCorrect === "boolean"
           ? res.isCorrect
-          : nextCorrectIndex !== undefined
-            ? selectedOptionIndex === nextCorrectIndex
+          : correctOptionIndex !== undefined
+            ? selectedOptionIndex === correctOptionIndex
             : undefined;
 
-      setFeedback({ correctOptionIndex: nextCorrectIndex, isCorrect: nextIsCorrect });
+      setFeedback({ correctOptionIndex, isCorrect });
+
+      // biar UX enak: setelah jawab, auto-scroll dikit ke bawah (kalau perlu)
+      setTimeout(() => {
+        listRef.current?.scrollToOffset({ offset: 0, animated: true });
+      }, 10);
 
       if (res.completed) {
         navigation.navigate("MissionResult", {
@@ -161,6 +176,7 @@ export default function MissionNextScreen({ navigation, route }: Props) {
     } as any);
   }
 
+  // Loading shell
   if (!data) {
     return (
       <View style={{ flex: 1 }}>
@@ -196,7 +212,7 @@ export default function MissionNextScreen({ navigation, route }: Props) {
               <Text style={styles.linkTxt}>View completion history</Text>
             </Pressable>
 
-            <Pressable style={styles.link} onPress={() => navigation.navigate("MissionHome")}>
+            <Pressable style={styles.link} onPress={() => navigation.navigate("MissionHome" as any)}>
               <Text style={styles.linkTxt}>Back to Mission Home</Text>
             </Pressable>
           </View>
@@ -220,6 +236,8 @@ export default function MissionNextScreen({ navigation, route }: Props) {
   const pct = totalQ ? Math.min(1, q.questionNumber / totalQ) : 0;
   const pctLabel = `${Math.round(pct * 100)}%`;
 
+  const correctIdx = feedback?.correctOptionIndex;
+
   const imageItems = useMemo(() => {
     return buildGridData(optionImages.map((uri, idx) => ({ id: String(idx), uri, idx })));
   }, [optionImages]);
@@ -232,48 +250,13 @@ export default function MissionNextScreen({ navigation, route }: Props) {
 
   const canNext = locked && !!pendingNextQuestion && !busy;
 
-  const Footer = (
-    <View style={[styles.footer, { paddingBottom: tabBarHeight + 14 }]}>
-      {/* feedback banner (web-like) */}
-      {locked && evaluatedIsCorrect !== undefined ? (
-        <View
-          style={[
-            styles.feedbackBanner,
-            evaluatedIsCorrect ? styles.feedbackSuccess : styles.feedbackError,
-          ]}
-        >
-          <Text style={styles.feedbackIcon}>{evaluatedIsCorrect ? "✓" : "✕"}</Text>
-          <Text style={styles.feedbackText}>
-            {evaluatedIsCorrect ? "Excellent!" : "Wrong :("}
-          </Text>
-        </View>
-      ) : null}
+  // ✅ FIX: biar list nggak ketutup snackbar + tombol
+  const listBottomPad = tabBarHeight + CTA_HEIGHT + SNACK_HEIGHT + 28;
 
-      <Pressable
-        style={[
-          styles.nextBtn,
-          (!locked || busy) && { opacity: 0.55 },
-          locked && !pendingNextQuestion && !busy && { opacity: 0.75 },
-        ]}
-        disabled={!locked || busy || !pendingNextQuestion}
-        onPress={goNext}
-      >
-        <Text style={styles.nextText}>
-          {busy ? "Submitting..." : pendingNextQuestion ? "Next" : "Select an answer"}
-        </Text>
-      </Pressable>
-
-      <View style={{ height: 8 }} />
-
-      <Pressable style={styles.link} onPress={() => navigation.navigate("MissionHistory")}>
-        <Text style={styles.linkTxt}>View completion history</Text>
-      </Pressable>
-
-      <Pressable style={styles.link} onPress={() => navigation.navigate("MissionHome")}>
-        <Text style={styles.linkTxt}>Back to Mission Home</Text>
-      </Pressable>
-    </View>
-  );
+  const snackbarVisible = locked && (feedback?.isCorrect !== undefined || typeof correctIdx === "number");
+  const snackbarCorrect =
+    feedback?.isCorrect === true ||
+    (typeof correctIdx === "number" && selectedIndex === correctIdx);
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -306,7 +289,7 @@ export default function MissionNextScreen({ navigation, route }: Props) {
 
         <View style={{ height: theme.spacing.lg }} />
 
-        {/* QUESTION (web-like card) */}
+        {/* QUESTION CARD (lebih mirip web) */}
         <View style={styles.questionCard}>
           <Text style={styles.qText}>{q.questionText}</Text>
           <Text style={styles.hintText}>
@@ -316,15 +299,18 @@ export default function MissionNextScreen({ navigation, route }: Props) {
 
         <View style={{ height: 12 }} />
 
-        {/* OPTIONS */}
+        {/* CONTENT */}
         {isImageMode ? (
           <FlatList
+            ref={listRef}
             data={imageItems}
             keyExtractor={(it) => it.id}
             numColumns={2}
-            columnWrapperStyle={{ gap: 12 }}
-            contentContainerStyle={{ gap: 12 }}
-            ListFooterComponent={Footer}
+            columnWrapperStyle={{ gap: GAP }}
+            contentContainerStyle={{
+              gap: GAP,
+              paddingBottom: listBottomPad,
+            }}
             renderItem={({ item }: any) => {
               if (item.id === "__spacer__") return <View style={{ flex: 1 }} />;
 
@@ -340,11 +326,12 @@ export default function MissionNextScreen({ navigation, route }: Props) {
                 selectedIndex === idx &&
                 idx !== correctIdx;
 
-              const showOnlySelected =
-                locked && typeof correctIdx !== "number" && selected && feedback?.isCorrect !== undefined;
-
-              const showCheck = showCorrect || (showOnlySelected && feedback?.isCorrect === true);
-              const showCross = showWrong || (showOnlySelected && feedback?.isCorrect === false);
+              // fallback kalau backend ga ngirim correctOptionIndex
+              const showOnlySelectedBadge =
+                locked &&
+                typeof correctIdx !== "number" &&
+                selected &&
+                feedback?.isCorrect !== undefined;
 
               return (
                 <Pressable
@@ -392,14 +379,9 @@ export default function MissionNextScreen({ navigation, route }: Props) {
                     </View>
                   ) : null}
 
-                  {(showCheck || showCross) && (
-                    <View style={[styles.cornerBadge, showCheck ? styles.cornerOk : styles.cornerBad]}>
-                      <Text style={styles.cornerBadgeText}>{showCheck ? "✓" : "✕"}</Text>
-                    </View>
-                  )}
-
-                  {locked && (showCorrect || showWrong || showOnlySelected) ? (
-                    <View style={styles.badge}>
+                  {/* Badge tetap ada (correct/wrong) */}
+                  {locked && (showCorrect || showWrong || showOnlySelectedBadge) ? (
+                    <View style={[styles.badge, showCorrect ? styles.badgeOk : styles.badgeBad]}>
                       <Text style={styles.badgeText}>
                         {showCorrect
                           ? "Correct"
@@ -417,10 +399,10 @@ export default function MissionNextScreen({ navigation, route }: Props) {
           />
         ) : (
           <FlatList
+            ref={listRef}
             data={textItems}
             keyExtractor={(it) => it.id}
-            contentContainerStyle={{ gap: 10 }}
-            ListFooterComponent={Footer}
+            contentContainerStyle={{ gap: 10, paddingBottom: listBottomPad }}
             renderItem={({ item }: any) => {
               const idx: number = item.idx;
               const selected = selectedIndex === idx;
@@ -447,6 +429,47 @@ export default function MissionNextScreen({ navigation, route }: Props) {
             }}
           />
         )}
+
+        {/* links */}
+        <Pressable style={styles.link} onPress={() => navigation.navigate("MissionHistory")}>
+          <Text style={styles.linkTxt}>View completion history</Text>
+        </Pressable>
+
+        <Pressable style={styles.link} onPress={() => navigation.navigate("MissionHome" as any)}>
+          <Text style={styles.linkTxt}>Back to Mission Home</Text>
+        </Pressable>
+      </View>
+
+      {/* ✅ Snackbar feedback (fixed, nggak ganggu konten) */}
+      {snackbarVisible ? (
+        <View
+          style={[
+            styles.snackbar,
+            { bottom: tabBarHeight + CTA_HEIGHT + 18 },
+            snackbarCorrect ? styles.snackbarOk : styles.snackbarBad,
+          ]}
+        >
+          <Text style={styles.snackbarText}>
+            {snackbarCorrect ? "✅ Excellent!" : "❌ Wrong :("}
+          </Text>
+        </View>
+      ) : null}
+
+      {/* ✅ Bottom Fixed CTA (posisi rapih, nggak nutup konten karena listBottomPad) */}
+      <View style={[styles.bottomCta, { bottom: tabBarHeight + 12 }]}>
+        <Pressable
+          style={[
+            styles.nextBtn,
+            (!locked || busy) && { opacity: 0.55 },
+            locked && !pendingNextQuestion && !busy && { opacity: 0.7 },
+          ]}
+          disabled={!locked || busy || !pendingNextQuestion}
+          onPress={goNext}
+        >
+          <Text style={styles.nextText}>
+            {busy ? "Submitting..." : pendingNextQuestion ? "Next" : "Select an answer"}
+          </Text>
+        </Pressable>
       </View>
     </SafeAreaView>
   );
@@ -485,12 +508,13 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.accent,
   },
 
+  // Question Card mirip web (rapih & kebaca)
   questionCard: {
     padding: theme.spacing.md,
     borderRadius: theme.radius.lg,
+    backgroundColor: theme.colors.card,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    backgroundColor: theme.colors.card,
   },
   qText: { fontSize: 16, fontWeight: "900", color: theme.colors.text, textAlign: "center" },
   hintText: {
@@ -502,17 +526,15 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 
-  // text option
   opt: {
     padding: theme.spacing.md,
-    borderRadius: theme.radius.md,
+    borderRadius: theme.radius.lg,
     borderWidth: 1,
     borderColor: theme.colors.border,
     backgroundColor: theme.colors.card,
   },
   optTxt: { fontWeight: "800", color: theme.colors.text },
 
-  // image option
   imgOpt: {
     flex: 1,
     aspectRatio: 1,
@@ -533,7 +555,6 @@ const styles = StyleSheet.create({
   },
   imgOverlayText: { marginTop: 8, fontWeight: "900", color: theme.colors.text },
 
-  // states
   optSelected: { borderColor: theme.colors.accent, borderWidth: 2 },
   optCorrect: { borderColor: "#16A34A", borderWidth: 2 },
   optWrong: { borderColor: "#DC2626", borderWidth: 2 },
@@ -545,57 +566,37 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 999,
-    backgroundColor: "rgba(0,0,0,0.55)",
   },
+  badgeOk: { backgroundColor: "rgba(22,163,74,0.85)" },
+  badgeBad: { backgroundColor: "rgba(220,38,38,0.85)" },
   badgeText: { color: "white", fontWeight: "900", fontSize: 12 },
 
-  cornerBadge: {
+  link: { paddingVertical: 8 },
+  linkTxt: { fontWeight: "900", color: theme.colors.accent },
+
+  // Snackbar fixed
+  snackbar: {
     position: "absolute",
-    right: 10,
-    top: 10,
-    width: 28,
-    height: 28,
-    borderRadius: 999,
+    left: theme.spacing.lg,
+    right: theme.spacing.lg,
+    height: SNACK_HEIGHT,
+    borderRadius: theme.radius.lg,
     alignItems: "center",
     justifyContent: "center",
-  },
-  cornerOk: { backgroundColor: "rgba(22,163,74,0.92)" },
-  cornerBad: { backgroundColor: "rgba(220,38,38,0.92)" },
-  cornerBadgeText: { color: "white", fontWeight: "900" },
-
-  footer: {
-    marginTop: theme.spacing.lg,
-    gap: 10,
-  },
-
-  feedbackBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    borderRadius: theme.radius.lg,
-    paddingVertical: 12,
-    paddingHorizontal: 12,
     borderWidth: 1,
   },
-  feedbackSuccess: {
-    backgroundColor: "rgba(22,163,74,0.12)",
-    borderColor: "rgba(22,163,74,0.30)",
-  },
-  feedbackError: {
-    backgroundColor: "rgba(220,38,38,0.12)",
-    borderColor: "rgba(220,38,38,0.30)",
-  },
-  feedbackIcon: { fontWeight: "900", fontSize: 16, color: theme.colors.text },
-  feedbackText: { fontWeight: "900", color: theme.colors.text },
+  snackbarOk: { backgroundColor: "rgba(34,197,94,0.18)", borderColor: "rgba(34,197,94,0.45)" },
+  snackbarBad: { backgroundColor: "rgba(239,68,68,0.14)", borderColor: "rgba(239,68,68,0.38)" },
+  snackbarText: { fontWeight: "900", color: theme.colors.text },
 
+  // Bottom CTA
+  bottomCta: { position: "absolute", left: theme.spacing.lg, right: theme.spacing.lg },
   nextBtn: {
-    paddingVertical: 14,
+    height: CTA_HEIGHT,
     borderRadius: theme.radius.lg,
     backgroundColor: theme.colors.accent,
     alignItems: "center",
+    justifyContent: "center",
   },
   nextText: { color: "white", fontWeight: "900" },
-
-  link: { paddingVertical: 6 },
-  linkTxt: { fontWeight: "900", color: theme.colors.accent },
 });
