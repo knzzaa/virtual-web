@@ -12,10 +12,18 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
+import Animated, {
+  Easing,
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withTiming,
+} from "react-native-reanimated";
 
 import theme from "../../styles/theme";
 import AnimatedAppBackground from "../../components/AnimatedAppBackground";
 import Button from "../../components/Button";
+import PurpleLights from "../../components/PurpleLights";
 import { missionService } from "../../services/mission.service";
 import type { MissionNextResponse, MissionAnswerResponse } from "../../types/dtos";
 
@@ -83,8 +91,40 @@ export default function MissionNextScreen({ navigation, route }: any) {
   } | null>(null);
 
   const footerBottom = tabBarHeight + insets.bottom + theme.spacing.sm;
-  const FOOTER_HEIGHT = 160;
-  const scrollBottomPadding = footerBottom + FOOTER_HEIGHT + theme.spacing.md;
+  const FOOTER_HEIGHT = 0; // No longer needed - footer is inside ScrollView
+  const scrollBottomPadding = footerBottom + theme.spacing.lg;
+
+  // Animation for completion image (hooks must be at top level)
+  const imageScale = useSharedValue(0);
+  const imageRotate = useSharedValue(0);
+
+  useEffect(() => {
+    // Only animate if mission is null (all completed)
+    if (mission === null && !loading) {
+      // Bounce in animation
+      imageScale.value = withTiming(1, {
+        duration: 700,
+        easing: Easing.out(Easing.back(1.3)),
+      });
+
+      // Continuous rotation
+      imageRotate.value = withRepeat(
+        withTiming(360, {
+          duration: 4000,
+          easing: Easing.linear,
+        }),
+        -1,
+        false
+      );
+    }
+  }, [mission, loading]);
+
+  const animatedImageStyle = useAnimatedStyle(() => ({
+    transform: [
+      { scale: imageScale.value },
+      { rotate: `${imageRotate.value}deg` },
+    ],
+  }));
 
   const canNext = selectedIndex !== null && !!checked?.show && !submitting;
 
@@ -185,32 +225,25 @@ export default function MissionNextScreen({ navigation, route }: any) {
         currentScore: Number(ans.currentScore ?? prev?.currentScore ?? 0),
       }));
 
-      if (ans.completed) return;
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const onNext = async () => {
-    if (!mission || !question) return;
-
-    setLoading(true);
-    try {
-      const res = await missionService.next();
-
-      if ((res as any)?.mission === null) {
-        const percentage = totalQ ? Math.round((score / totalQ) * 100) : 0;
-        navigation.navigate("MissionResult", {
-          percentage,
-          finalScore: score,
-          totalQuestions: totalQ,
-        });
+      if (ans.completed) {
+        // Mission completed! Navigate to result after 2 seconds
+        setTimeout(() => {
+          const percentage = ans.percentage ?? 0;
+          navigation.navigate("MissionResult", {
+            percentage,
+            finalScore: ans.finalScore ?? 0,
+            totalQuestions: ans.totalQuestions ?? 0,
+          });
+        }, 2000);
         return;
       }
 
-      normalizeAndSet(res);
+      // Auto-next after 2 seconds
+      setTimeout(() => {
+        loadNext();
+      }, 2000);
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
@@ -218,11 +251,21 @@ export default function MissionNextScreen({ navigation, route }: any) {
     return (
       <View style={styles.screen}>
         <AnimatedAppBackground />
-        <View style={[styles.wrap, { paddingTop: insets.top + 54 }]}>
-          <View style={styles.card}>
-            <Text style={styles.title}>Mission</Text>
-            <Text style={styles.subtitle}>All missions completed!</Text>
-            <Text style={styles.emptyNote}>You’ve completed all missions.</Text>
+        <PurpleLights count={12} speed={3.5} />
+        <View style={[styles.wrap, { paddingTop: insets.top + 54, justifyContent: "center", alignItems: "center" }]}>
+          {/* Animated completion image */}
+          <Animated.View style={[styles.completionImageContainer, animatedImageStyle]}>
+            <Image
+              source={require("../../../assets/img/mission-completed.png")}
+              style={styles.completionImage}
+              resizeMode="contain"
+            />
+          </Animated.View>
+
+          {/* Text below image */}
+          <View style={styles.completionCard}>
+            <Text style={styles.completionTitle}>All missions completed!</Text>
+            <Text style={styles.completionNote}>You've completed all missions. 🎉</Text>
           </View>
         </View>
       </View>
@@ -234,6 +277,7 @@ export default function MissionNextScreen({ navigation, route }: any) {
   return (
     <View style={styles.screen}>
       <AnimatedAppBackground />
+      <PurpleLights count={8} speed={4.5} />
 
       <ScrollView
         style={styles.wrap}
@@ -323,56 +367,45 @@ export default function MissionNextScreen({ navigation, route }: any) {
             })
           )}
         </View>
-      </ScrollView>
 
-      {/* Floating footer */}
-      <View
-        pointerEvents="box-none"
-        style={[
-          styles.footerWrap,
-          {
-            left: theme.spacing.lg,
-            right: theme.spacing.lg,
-            bottom: footerBottom,
-            height: FOOTER_HEIGHT,
-          },
-        ]}
-      >
-        <View style={styles.footerCard}>
-          <Button
-            title={loading ? "Loading..." : checked?.show ? "Next" : submitting ? "Submitting..." : "Next"}
-            onPress={onNext}
-            disabled={!canNext || loading}
-          />
-
-          {/* ✅ feedback jelas & kontras */}
-          <Text style={styles.footerHint}>
-            {submitting
-              ? "Checking your answer..."
-              : checked?.show
-              ? checked.isCorrect
-                ? "✅ Correct!"
-                : `❌ Wrong — correct is option #${checked.correctOptionIndex + 1}`
-              : "Select an answer to continue"}
-          </Text>
-
-          <View style={styles.footerRow}>
-            <Pressable
-              onPress={() => navigation.navigate("MissionHistory")}
-              style={({ pressed }) => [styles.submissionsPill, pressed && { opacity: 0.9 }]}
-            >
-              <Text style={styles.submissionsText}>View History</Text>
-            </Pressable>
-
-            <Pressable
-              onPress={() => navigation.navigate("MissionHome")}
-              style={({ pressed }) => [styles.submissionsPill, pressed && { opacity: 0.9 }]}
-            >
-              <Text style={styles.submissionsText}>Back to Mission</Text>
-            </Pressable>
-          </View>
+        {/* Footer hint - moved inside ScrollView */}
+        <View style={[
+          styles.footerCard,
+          { marginTop: theme.spacing.lg },
+          checked?.show && {
+            borderColor: checked.isCorrect ? "rgba(22, 163, 74, 0.6)" : "rgba(220, 38, 38, 0.6)",
+            backgroundColor: checked.isCorrect ? "rgba(22, 163, 74, 0.1)" : "rgba(220, 38, 38, 0.1)",
+            borderWidth: 2,
+          }
+        ]}>
+          {submitting ? (
+            <Text style={[styles.footerHint]}>Checking your answer...</Text>
+          ) : checked?.show ? (
+            <>
+              <Text style={[
+                styles.footerHint,
+                {
+                  color: checked.isCorrect ? "rgba(22, 163, 74, 0.95)" : "rgba(220, 38, 38, 0.95)",
+                }
+              ]}>
+                {checked.isCorrect ? "Correct Answer :)" : "Wrong Answer :("}
+              </Text>
+              {!checked.isCorrect && (
+                <Text style={[
+                  styles.footerHintSecondary,
+                  {
+                    color: "rgba(220, 38, 38, 0.95)",
+                  }
+                ]}>
+                  Correct is Option {checked.correctOptionIndex + 1}
+                </Text>
+              )}
+            </>
+          ) : (
+            <Text style={[styles.footerHint]}>Select an answer to continue</Text>
+          )}
         </View>
-      </View>
+      </ScrollView>
     </View>
   );
 }
@@ -450,6 +483,29 @@ const styles = StyleSheet.create({
   footerCard: {
     padding: 18,
     borderWidth: 1,
+    borderColor: "rgba(167, 139, 250, 0.3)",
+    borderRadius: 26,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  footerHint: { fontSize: 16, textAlign: "center", color: "rgba(88, 28, 135, 0.8)", opacity: 0.95, fontWeight: "700", lineHeight: 22 },
+  footerHintSecondary: { fontSize: 14, textAlign: "center", opacity: 0.9, fontWeight: "600", lineHeight: 20, marginTop: 8 },
+
+  completionImageContainer: {
+    width: 240,
+    height: 240,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: theme.spacing.xl,
+  },
+  completionImage: {
+    width: "100%",
+    height: "100%",
+  },
+  completionCard: {
+    padding: 28,
+    borderWidth: 1,
     borderColor: CARD_BORDER,
     borderRadius: 26,
     backgroundColor: CARD_BG,
@@ -457,25 +513,20 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.10,
     shadowRadius: 22,
     shadowOffset: { width: 0, height: 14 },
-  },
-  footerHint: { marginTop: 8, textAlign: "center", fontSize: 12, color: META, opacity: 0.95, fontWeight: "800" },
-
-  footerRow: { marginTop: theme.spacing.sm, flexDirection: "row", gap: theme.spacing.sm },
-
-  // ✅ same as "View submissions" pill
-  submissionsPill: {
-    flex: 1,
     alignItems: "center",
-    paddingVertical: 9,
-    paddingHorizontal: 12,
-    borderRadius: 999,
-    borderWidth: 1,
-    backgroundColor: PILL_BG,
-    borderColor: PILL_BORDER,
-    shadowColor: "rgba(0,0,0,1)",
-    shadowOpacity: 0.10,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 8 },
+    maxWidth: 360,
   },
-  submissionsText: { fontSize: 12, fontWeight: "800", color: PILL_TEXT },
+  completionTitle: {
+    fontWeight: "900",
+    fontSize: 24,
+    color: TITLE,
+    textAlign: "center",
+    marginBottom: 12,
+  },
+  completionNote: {
+    fontWeight: "700",
+    fontSize: 16,
+    color: DESC,
+    textAlign: "center",
+  },
 });
