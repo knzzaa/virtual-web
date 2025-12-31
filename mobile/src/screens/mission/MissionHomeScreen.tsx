@@ -10,32 +10,34 @@ import {
   Animated,
   Easing,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { MissionStackParamList } from "../../navigation/MissionStack";
 import { missionService } from "../../services/mission.service";
 import type { MissionNextResponse } from "../../types/dtos";
 import theme from "../../styles/theme";
 import AnimatedAppBackground from "../../components/AnimatedAppBackground";
-import Button from "../../components/Button";
 
 type Props = NativeStackScreenProps<MissionStackParamList, "MissionHome">;
 
-// Palette ungu yang sama dengan Button.tsx & background kamu
-const PURPLE_BASE = "rgba(124, 58, 237, 1)";
-const PURPLE_MID = "rgba(167, 139, 250, 1)";
-const PURPLE_LIGHT = "rgba(196, 181, 253, 1)";
-const PURPLE_TEXT = "rgba(76, 29, 149, 0.95)";
+// match Material/Exam palette
+const TITLE = "rgba(88, 28, 135, 0.94)";
+const DESC = "rgba(88, 28, 135, 0.72)";
+const EMPTY = "rgba(88, 28, 135, 0.82)";
 
-const CARD_BG = "rgba(255,255,255,0.70)";
-const CARD_BG_SOFT = "rgba(255,255,255,0.58)";
-const PURPLE_SOFT = "rgba(124,58,237,0.10)";
-const PURPLE_BORDER = "rgba(124,58,237,0.18)";
+const CARD_BG = "rgba(255,255,255,0.18)";
+const CARD_BORDER = "rgba(255,255,255,0.45)";
+
+const PILL_BG = "rgba(167, 139, 250, 0.10)";
+const PILL_BORDER = "rgba(167, 139, 250, 0.22)";
+const PILL_TEXT = "rgba(88, 28, 135, 0.80)";
 
 export default function MissionHomeScreen({ navigation }: Props) {
   const [data, setData] = useState<MissionNextResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const insets = useSafeAreaInsets();
 
-  // icon animation: float + rotate + glow
+  // icon animation (tetep boleh, tapi warnanya disamain)
   const anim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     const loop = Animated.loop(
@@ -59,11 +61,7 @@ export default function MissionHomeScreen({ navigation }: Props) {
   }, [anim]);
 
   const iconTranslateY = anim.interpolate({ inputRange: [0, 1], outputRange: [-6, 6] });
-  const iconScale = anim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] });
-  const iconRotate = anim.interpolate({ inputRange: [0, 1], outputRange: ["-2deg", "2deg"] });
-
-  const haloScale = anim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.18] });
-  const haloOpacity = anim.interpolate({ inputRange: [0, 1], outputRange: [0.22, 0.10] });
+  const iconScale = anim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.06] });
 
   async function load() {
     setLoading(true);
@@ -84,8 +82,7 @@ export default function MissionHomeScreen({ navigation }: Props) {
   const mission = (data as any)?.mission ?? null;
 
   const title = useMemo(() => {
-    if (!data) return "Mission";
-    if (mission === null) return "Mission";
+    if (!data || mission === null) return "Mission";
     return mission?.title ?? "Mission";
   }, [data, mission]);
 
@@ -111,31 +108,18 @@ export default function MissionHomeScreen({ navigation }: Props) {
   const canStart = !loading && !!data && mission !== null;
 
   return (
-    <View style={styles.screen}>
+    <View style={{ flex: 1 }}>
       <AnimatedAppBackground />
 
-      <View style={styles.wrap}>
-        <View style={[styles.card, { backgroundColor: CARD_BG, borderColor: PURPLE_BORDER }]}>
-          <View style={{ alignItems: "center" }}>
-            <View style={styles.iconWrap}>
-              <Animated.View
-                pointerEvents="none"
-                style={[
-                  styles.iconHalo,
-                  {
-                    backgroundColor: PURPLE_BASE,
-                    opacity: haloOpacity,
-                    transform: [{ scale: haloScale }],
-                  },
-                ]}
-              />
+      <View style={{ flex: 1, padding: theme.spacing.lg }}>
+        {/* ✅ sama kayak Material/Exam: paddingTop insets.top + 54 */}
+        <View style={{ paddingTop: insets.top + 54 }}>
+          <View style={styles.card}>
+            <View style={{ alignItems: "center" }}>
               <Animated.View
                 style={[
                   styles.iconRing,
-                  {
-                    borderColor: "rgba(124,58,237,0.25)",
-                    transform: [{ translateY: iconTranslateY }, { scale: iconScale }, { rotate: iconRotate }],
-                  },
+                  { transform: [{ translateY: iconTranslateY }, { scale: iconScale }] },
                 ]}
               >
                 <Image
@@ -144,77 +128,79 @@ export default function MissionHomeScreen({ navigation }: Props) {
                   resizeMode="contain"
                 />
               </Animated.View>
+
+              <Text style={styles.title} numberOfLines={2}>
+                {title}
+              </Text>
+              <Text style={styles.desc} numberOfLines={3}>
+                {desc}
+              </Text>
             </View>
 
-            <Text style={[styles.title, { color: PURPLE_TEXT }]} numberOfLines={2}>
-              {title}
-            </Text>
-            <Text style={[styles.desc, { color: theme.colors.muted }]} numberOfLines={3}>
-              {desc}
-            </Text>
-          </View>
+            <View style={{ height: theme.spacing.lg }} />
 
-          <View style={{ height: theme.spacing.lg }} />
+            <View style={styles.statsRow}>
+              <View style={styles.statCard}>
+                <Text style={styles.statValue}>{totalQuestions || "-"}</Text>
+                <Text style={styles.statLabel}>Questions</Text>
+              </View>
 
-          <View style={styles.statsRow}>
-            <View style={[styles.statCard, { backgroundColor: CARD_BG_SOFT, borderColor: "rgba(124,58,237,0.14)" }]}>
-              <Text style={[styles.statValue, { color: theme.colors.text }]}>{totalQuestions || "-"}</Text>
-              <Text style={[styles.statLabel, { color: PURPLE_BASE }]}>Questions</Text>
+              <View style={{ width: theme.spacing.md }} />
+
+              <View style={styles.statCard}>
+                <Text style={styles.statValue}>{minutes || "-"}</Text>
+                <Text style={styles.statLabel}>Minutes</Text>
+              </View>
             </View>
 
-            <View style={{ width: theme.spacing.md }} />
+            <View style={{ height: theme.spacing.lg }} />
 
-            <View style={[styles.statCard, { backgroundColor: CARD_BG_SOFT, borderColor: "rgba(124,58,237,0.14)" }]}>
-              <Text style={[styles.statValue, { color: theme.colors.text }]}>{minutes || "-"}</Text>
-              <Text style={[styles.statLabel, { color: PURPLE_BASE }]}>Minutes</Text>
-            </View>
-          </View>
-
-          <View style={{ height: theme.spacing.lg }} />
-
-          {/* Primary CTA (pakai Button.tsx kamu biar sama persis fitur lain) */}
-          <Button
-            title={loading ? "Loading…" : mission === null ? "All Completed" : "Start Mission"}
-            disabled={!canStart || loading}
-            onPress={() => navigation.navigate("MissionNext", { initialData: data ?? undefined })}
-          />
-
-          <View style={{ height: theme.spacing.md }} />
-
-          <View style={styles.ctaRow}>
+            {/* ✅ Start Mission: dibikin pill (bukan gradient) supaya nyatu sama Exam/Material */}
             <Pressable
-              style={[
-                styles.secondaryBtn,
-                { borderColor: "rgba(124,58,237,0.28)", backgroundColor: PURPLE_SOFT },
+              disabled={!canStart || loading}
+              onPress={() => navigation.navigate("MissionNext", { initialData: data ?? undefined })}
+              style={({ pressed }) => [
+                styles.primaryPill,
+                (!canStart || loading) && { opacity: 0.55 },
+                pressed && { opacity: 0.9 },
               ]}
-              onPress={() => navigation.navigate("MissionHistory")}
             >
-              <Text style={[styles.secondaryText, { color: PURPLE_TEXT }]}>View History</Text>
-            </Pressable>
-
-            <View style={{ width: theme.spacing.md }} />
-
-            <Pressable
-              style={[
-                styles.secondaryBtn,
-                { borderColor: "rgba(124,58,237,0.28)", backgroundColor: "rgba(255,255,255,0.45)" },
-              ]}
-              onPress={load}
-            >
-              <Text style={[styles.secondaryText, { color: PURPLE_TEXT }]}>
-                {loading ? "Refreshing…" : "Refresh"}
+              <Text style={styles.primaryPillText}>
+                {loading ? "Loading…" : mission === null ? "All Completed" : "Start Mission"}
               </Text>
             </Pressable>
-          </View>
 
-          {loading ? (
-            <View style={{ marginTop: 10, alignItems: "center" }}>
-              <ActivityIndicator />
+            <View style={{ height: theme.spacing.md }} />
+
+            {/* ✅ View History + Refresh: persis gaya "View submissions" */}
+            <View style={styles.ctaRow}>
+              <Pressable
+                style={({ pressed }) => [styles.submissionsPill, pressed && { opacity: 0.9 }]}
+                onPress={() => navigation.navigate("MissionHistory")}
+              >
+                <Text style={styles.submissionsText}>View History</Text>
+              </Pressable>
+
+              <View style={{ width: theme.spacing.md }} />
+
+              <Pressable
+                style={({ pressed }) => [styles.submissionsPill, pressed && { opacity: 0.9 }]}
+                onPress={load}
+              >
+                <Text style={styles.submissionsText}>{loading ? "Refreshing…" : "Refresh"}</Text>
+              </Pressable>
             </View>
-          ) : null}
 
-          {/* subtle accent line biar nyambung sama gradient vibe */}
-          <View style={[styles.softLine, { backgroundColor: PURPLE_LIGHT }]} />
+            {loading ? (
+              <View style={{ marginTop: 10, alignItems: "center" }}>
+                <ActivityIndicator />
+              </View>
+            ) : null}
+
+            {!loading && mission === null ? (
+              <Text style={styles.emptyNote}>You’ve completed all missions.</Text>
+            ) : null}
+          </View>
         </View>
       </View>
     </View>
@@ -222,65 +208,84 @@ export default function MissionHomeScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "transparent" },
-  wrap: { flex: 1, padding: theme.spacing.lg },
-
   card: {
-    padding: theme.spacing.lg,
+    padding: 18,
     borderWidth: 1,
-    borderRadius: theme.radius.lg,
+    borderColor: CARD_BORDER,
+    borderRadius: 26,
+    marginBottom: theme.spacing.md,
+    backgroundColor: CARD_BG,
+    shadowColor: "rgba(0,0,0,1)",
+    shadowOpacity: 0.10,
+    shadowRadius: 22,
+    shadowOffset: { width: 0, height: 14 },
   },
 
-  iconWrap: { position: "relative", width: 118, height: 118, alignItems: "center", justifyContent: "center" },
-  iconHalo: { position: "absolute", width: 110, height: 110, borderRadius: 999 },
   iconRing: {
-    width: 102,
-    height: 102,
+    width: 96,
+    height: 96,
     borderRadius: 999,
     borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.55)",
+    backgroundColor: "rgba(255,255,255,0.18)",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.55)",
-    shadowColor: "rgba(124, 58, 237, 1)",
-    shadowOpacity: 0.18,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 6,
+    shadowColor: "rgba(0,0,0,1)",
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 12 },
   },
-  icon: { width: 58, height: 58 },
+  icon: { width: 56, height: 56 },
 
-  title: { fontSize: 22, fontWeight: "900", textAlign: "center" },
-  desc: { marginTop: 6, opacity: 0.9, fontWeight: "700", textAlign: "center" },
+  title: { fontWeight: "800", fontSize: 18, marginTop: 12, marginBottom: 6, color: TITLE, lineHeight: 24, textAlign: "center" },
+  desc: { opacity: 0.95, marginBottom: 8, color: DESC, lineHeight: 19, fontSize: 13, textAlign: "center", fontWeight: "700" },
 
   statsRow: { flexDirection: "row" },
   statCard: {
     flex: 1,
-    padding: theme.spacing.lg,
+    padding: 14,
     borderWidth: 1,
-    borderRadius: theme.radius.lg,
+    borderRadius: 22,
+    borderColor: "rgba(255,255,255,0.45)",
+    backgroundColor: "rgba(255,255,255,0.14)",
     alignItems: "center",
     justifyContent: "center",
   },
-  statValue: { fontSize: 20, fontWeight: "900" },
-  statLabel: { marginTop: 6, fontSize: 12, fontWeight: "900", opacity: 0.95 },
+  statValue: { fontSize: 18, fontWeight: "800", color: TITLE },
+  statLabel: { marginTop: 6, fontSize: 12, fontWeight: "800", color: DESC },
+
+  primaryPill: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 14,
+    borderRadius: 999,
+    borderWidth: 1,
+    backgroundColor: "rgba(167, 139, 250, 0.16)",
+    borderColor: "rgba(167, 139, 250, 0.30)",
+    shadowColor: "rgba(0,0,0,1)",
+    shadowOpacity: 0.10,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 8 },
+  },
+  primaryPillText: { fontSize: 13, fontWeight: "900", color: "rgba(88, 28, 135, 0.90)", letterSpacing: 0.3 },
 
   ctaRow: { flexDirection: "row", alignItems: "center" },
 
-  secondaryBtn: {
+  submissionsPill: {
     flex: 1,
-    paddingVertical: 14,
-    paddingHorizontal: 14,
-    borderRadius: 18, // match Button radius vibe
-    borderWidth: 1,
     alignItems: "center",
-    justifyContent: "center",
-  },
-  secondaryText: { fontWeight: "900", letterSpacing: 0.3 },
-
-  softLine: {
-    marginTop: 14,
-    height: 3,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
     borderRadius: 999,
-    opacity: 0.35,
+    borderWidth: 1,
+    backgroundColor: PILL_BG,
+    borderColor: PILL_BORDER,
+    shadowColor: "rgba(0,0,0,1)",
+    shadowOpacity: 0.10,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 8 },
   },
+  submissionsText: { fontSize: 12, fontWeight: "800", color: PILL_TEXT },
+
+  emptyNote: { color: EMPTY, textAlign: "center", marginTop: 12, fontWeight: "800" },
 });
