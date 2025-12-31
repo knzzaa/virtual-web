@@ -4,10 +4,17 @@ import { missionService } from "../../services/mission.service";
 import type { MissionCompletionHistoryItem } from "../../types/dtos";
 import theme from "../../styles/theme";
 import AnimatedAppBackground from "../../components/AnimatedAppBackground";
+import { useHeaderHeight } from "@react-navigation/elements";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 
 export default function MissionHistoryScreen() {
   const [items, setItems] = useState<MissionCompletionHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const headerHeight = useHeaderHeight();
+  const insets = useSafeAreaInsets();
+  const tabBarHeight = useBottomTabBarHeight();
 
   async function load() {
     setLoading(true);
@@ -26,8 +33,13 @@ export default function MissionHistoryScreen() {
   return (
     <View style={styles.screen}>
       <AnimatedAppBackground />
-      <View style={styles.wrap}>
+
       <FlatList
+        contentContainerStyle={{
+          paddingTop: headerHeight + theme.spacing.md,
+          paddingHorizontal: theme.spacing.lg,
+          paddingBottom: tabBarHeight + insets.bottom + theme.spacing.lg,
+        }}
         data={items}
         keyExtractor={(it) => String(it.id)}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={load} />}
@@ -35,20 +47,21 @@ export default function MissionHistoryScreen() {
           <View style={styles.card}>
             <Text style={styles.title}>{item.missionTitle}</Text>
             <Text style={styles.meta}>
-              Score {item.score}/{item.totalQuestions} • {new Date(item.completedAt).toLocaleString()}
+              Score {item.score}/{item.totalQuestions} •{" "}
+              {new Date(item.completedAt).toLocaleString()}
             </Text>
           </View>
         )}
-        ListEmptyComponent={!loading ? <Text>No history.</Text> : <Text>Loading...</Text>}
+        ListEmptyComponent={
+          !loading ? <Text style={styles.empty}>No history.</Text> : <Text style={styles.empty}>Loading...</Text>
+        }
       />
-      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  wrap: { flex: 1, padding: theme.spacing.lg },
   card: {
     padding: theme.card.padding,
     borderWidth: theme.card.borderWidth,
@@ -59,4 +72,5 @@ const styles = StyleSheet.create({
   },
   title: { fontWeight: "900", color: theme.colors.text },
   meta: { opacity: 0.6, marginTop: 4, fontSize: 12, color: theme.colors.muted },
+  empty: { color: theme.colors.muted, fontWeight: "800", paddingTop: theme.spacing.lg },
 });
