@@ -41,5 +41,9 @@
   "devDependencies": {
     "babel-preset-expo": "^54.0.9",
     "typescript": "^5.4.0"
+  },
+  "overrides": {
+    "react-native-worklets-core": "0.5.1",
+    "react-native-worklets": "0.5.1"
   }
 }
