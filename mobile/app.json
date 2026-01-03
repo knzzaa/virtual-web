@@ -19,6 +19,11 @@
     },
     "android": {
       "package": "com.anonymous.englishlab"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "2871f588-b61f-468b-944a-028c3d8ac9da"
+      }
     }
   }
 }
